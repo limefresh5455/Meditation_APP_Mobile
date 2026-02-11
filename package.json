@@ -10,10 +10,30 @@
     "test": "jest"
   },
   "dependencies": {
+    "@react-native/new-app-screen": "0.83.1",
+    "@react-navigation/bottom-tabs": "^7.13.0",
+    "@react-navigation/elements": "^2.9.5",
+    "@react-navigation/native": "^7.1.28",
+    "@react-navigation/native-stack": "^7.12.0",
+    "@reduxjs/toolkit": "^2.2.3",
+    "axios": "^1.4.0",
+    "lottie-react-native": "^7.3.5",
     "react": "19.2.0",
     "react-native": "0.83.1",
-    "@react-native/new-app-screen": "0.83.1",
-    "react-native-safe-area-context": "^5.5.2"
+    "react-native-image-picker": "^8.2.1",
+    "react-native-keyboard-aware-scroll-view": "^0.9.5",
+    "react-native-linear-gradient": "^2.8.3",
+    "react-native-mmkv": "^3.3.0",
+    "react-native-safe-area-context": "^5.6.2",
+    "react-native-screens": "^4.23.0",
+    "react-native-simple-toast": "^3.3.2",
+    "react-native-size-matters": "^0.4.2",
+    "react-native-vector-icons": "^10.3.0",
+    "react-redux": "^9.1.1",
+    "redux": "^5.0.1",
+    "redux-persist": "^6.0.0",
+    "zustand": "^5.0.11",
+    "react-native-gesture-handler": "^2.16.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
