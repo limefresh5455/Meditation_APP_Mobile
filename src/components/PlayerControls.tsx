@@ -1,8 +1,9 @@
 import React, { FC } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../constants/Colors';
 import { FONTS } from '../constants/Fonts';
-import { theme } from '../utils/responsive';
+import { isTablet, theme } from '../utils/responsive';
 
 interface PlayerControlsProps {
   isPlaying: boolean;
@@ -31,7 +32,6 @@ const PlayerControls: FC<PlayerControlsProps> = ({
 }) => {
   return (
     <View style={styles.container}>
-      {/* Skip Controls */}
       <View style={styles.skipControls}>
         <TouchableOpacity
           style={styles.skipButton}
@@ -59,7 +59,11 @@ const PlayerControls: FC<PlayerControlsProps> = ({
           onPress={onLoop}
           activeOpacity={0.7}
         >
-          <Text style={styles.actionIcon}>🔁</Text>
+          <Icon
+            name="repeat"
+            size={theme.font.xxl}
+            color={isLooping ? Colors.primary : Colors.textSecondary}
+          />
           <Text style={[styles.actionLabel, isLooping && styles.activeLabel]}>
             LOOP
           </Text>
@@ -70,7 +74,11 @@ const PlayerControls: FC<PlayerControlsProps> = ({
           onPress={onSave}
           activeOpacity={0.7}
         >
-          <Text style={styles.actionIcon}>❤️</Text>
+          <Icon
+            name={isSaved ? 'heart' : 'heart-outline'}
+            size={theme.font.xxl}
+            color={isSaved ? Colors.primary : Colors.textSecondary}
+          />
           <Text style={[styles.actionLabel, isSaved && styles.activeLabel]}>
             SAVE
           </Text>
@@ -81,7 +89,11 @@ const PlayerControls: FC<PlayerControlsProps> = ({
           onPress={onOffline}
           activeOpacity={0.7}
         >
-          <Text style={styles.actionIcon}>📥</Text>
+          <Icon
+            name="download-outline"
+            size={theme.font.xxl}
+            color={isOffline ? Colors.primary : Colors.textSecondary}
+          />
           <Text style={[styles.actionLabel, isOffline && styles.activeLabel]}>
             OFFLINE
           </Text>
@@ -99,21 +111,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: theme.spacing.xl,
+    marginBottom: isTablet() ? theme.spacing.lg : theme.spacing.xl,
   },
   skipButton: {
-    marginHorizontal: theme.spacing.xl,
+    marginHorizontal: isTablet() ? theme.spacing.xl : theme.spacing.xl,
     alignItems: 'center',
   },
   skipIcon: {
-    fontSize: theme.font.xxl,
+    fontSize: theme.font.xxl * 1.2,
     color: Colors.textSecondary,
   },
   skipText: {
-    fontSize: theme.font.xs,
+    fontSize: isTablet() ? theme.font.xs : theme.font.xs,
     color: Colors.textSecondary,
     fontFamily: FONTS.Regular,
-    marginTop: -8,
+    marginTop: isTablet() ? -8 : -8,
   },
   actionButtons: {
     flexDirection: 'row',
@@ -123,14 +135,11 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     alignItems: 'center',
-  },
-  actionIcon: {
-    fontSize: theme.font.lg,
-    marginBottom: theme.spacing.xs,
+    gap: theme.spacing.xs,
   },
   actionLabel: {
     fontFamily: FONTS.Regular,
-    fontSize: theme.font.xs,
+    fontSize: isTablet() ? theme.font.xs : theme.font.xs,
     color: Colors.textSecondary,
     letterSpacing: 1,
   },

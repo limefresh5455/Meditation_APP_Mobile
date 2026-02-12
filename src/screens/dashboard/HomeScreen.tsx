@@ -85,10 +85,10 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
             </TouchableOpacity>
           </View>
           <View style={styles.focusAreasContainer}>
-            <FocusAreaIcon icon="🧘" label="Stress" />
-            <FocusAreaIcon icon="😴" label="Sleep" />
-            <FocusAreaIcon icon="🎯" label="Focus" />
-            <FocusAreaIcon icon="💆" label="Anxiety" />
+            <FocusAreaIcon iconName="fitness-outline" label="Stress" />
+            <FocusAreaIcon iconName="moon-outline" label="Sleep" />
+            <FocusAreaIcon iconName="bulb-outline" label="Focus" />
+            <FocusAreaIcon iconName="heart-outline" label="Anxiety" />
           </View>
         </View>
 
@@ -256,6 +256,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.Bold,
     fontSize: theme.font.lg,
     color: Colors.textPrimary,
+    marginBottom: theme.spacing.md,
   },
   seeAllText: {
     fontFamily: FONTS.SemiBold,

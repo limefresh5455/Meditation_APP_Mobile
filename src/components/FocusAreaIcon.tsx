@@ -1,18 +1,19 @@
 import React, { FC } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../constants/Colors';
 import { FONTS } from '../constants/Fonts';
 import { theme } from '../utils/responsive';
 
 interface FocusAreaIconProps {
-  icon: string;
+  iconName: string;
   label: string;
   isActive?: boolean;
   onPress?: () => void;
 }
 
 const FocusAreaIcon: FC<FocusAreaIconProps> = ({
-  icon,
+  iconName,
   label,
   isActive = false,
   onPress,
@@ -26,7 +27,11 @@ const FocusAreaIcon: FC<FocusAreaIconProps> = ({
       <View
         style={[styles.iconContainer, isActive && styles.iconContainerActive]}
       >
-        <Text style={styles.iconText}>{icon}</Text>
+        <Icon
+          name={iconName}
+          size={theme.font.xxl}
+          color={isActive ? Colors.white : Colors.primary}
+        />
       </View>
       <Text style={styles.label}>{label}</Text>
     </TouchableOpacity>
@@ -49,9 +54,6 @@ const styles = StyleSheet.create({
   },
   iconContainerActive: {
     backgroundColor: Colors.primary,
-  },
-  iconText: {
-    fontSize: theme.font.lg,
   },
   label: {
     fontFamily: FONTS.Regular,

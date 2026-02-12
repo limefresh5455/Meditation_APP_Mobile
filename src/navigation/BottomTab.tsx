@@ -1,17 +1,21 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { FC } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Icon from 'react-native-vector-icons/Ionicons';
 import HomeScreen from '../screens/dashboard/HomeScreen';
 import ExploreScreen from '../screens/dashboard/ExploreScreen';
 import LibraryScreen from '../screens/dashboard/LibraryScreen';
-import StatsScreen from '../screens/dashboard/StatsScreen';
 import ProfileScreen from '../screens/dashboard/ProfileScreen';
 import { Colors } from '../constants/Colors';
 import { FONTS } from '../constants/Fonts';
-import { theme } from '../utils/responsive';
+import { isTablet, theme } from '../utils/responsive';
 
 const Tab = createBottomTabNavigator();
 
 const BottomTab: FC = () => {
+  const insets = useSafeAreaInsets();
+  const iconSize = isTablet() ? 28 : 24;
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -20,15 +24,16 @@ const BottomTab: FC = () => {
           backgroundColor: Colors.background,
           borderTopColor: Colors.border,
           borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 8,
+          height: isTablet() ? 80 + insets.bottom : 60 + insets.bottom,
+          paddingBottom: insets.bottom + 8,
+          paddingTop: isTablet() ? 14 : 12,
         },
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.iconInactive,
         tabBarLabelStyle: {
           fontFamily: FONTS.Regular,
-          fontSize: theme.font.xs,
+          fontSize: isTablet() ? theme.font.sm : theme.font.xs,
+          marginTop: isTablet() ? 4 : 2,
         },
       }}
     >
@@ -36,48 +41,55 @@ const BottomTab: FC = () => {
         name="Home"
         component={HomeScreen}
         options={{
-          tabBarIcon: ({ color }) => <TabIcon icon="🏠" color={color} />,
+          tabBarIcon: ({ focused, color }) => (
+            <Icon
+              name={focused ? 'home' : 'home-outline'}
+              size={iconSize}
+              color={color}
+            />
+          ),
         }}
       />
       <Tab.Screen
         name="Explore"
         component={ExploreScreen}
         options={{
-          tabBarIcon: ({ color }) => <TabIcon icon="🔍" color={color} />,
+          tabBarIcon: ({ focused, color }) => (
+            <Icon
+              name={focused ? 'compass' : 'compass-outline'}
+              size={iconSize}
+              color={color}
+            />
+          ),
         }}
       />
       <Tab.Screen
         name="Library"
         component={LibraryScreen}
         options={{
-          tabBarIcon: ({ color }) => <TabIcon icon="📚" color={color} />,
-        }}
-      />
-      <Tab.Screen
-        name="Stats"
-        component={StatsScreen}
-        options={{
-          tabBarIcon: ({ color }) => <TabIcon icon="📊" color={color} />,
+          tabBarIcon: ({ focused, color }) => (
+            <Icon
+              name={focused ? 'library' : 'library-outline'}
+              size={iconSize}
+              color={color}
+            />
+          ),
         }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
         options={{
-          tabBarIcon: ({ color }) => <TabIcon icon="👤" color={color} />,
+          tabBarIcon: ({ focused, color }) => (
+            <Icon
+              name={focused ? 'person' : 'person-outline'}
+              size={iconSize}
+              color={color}
+            />
+          ),
         }}
       />
     </Tab.Navigator>
-  );
-};
-
-// Simple icon component
-const TabIcon: FC<{ icon: string; color: string }> = ({ icon, color }) => {
-  const { Text } = require('react-native');
-  return (
-    <Text style={{ fontSize: 24, opacity: color === Colors.primary ? 1 : 0.5 }}>
-      {icon}
-    </Text>
   );
 };
 

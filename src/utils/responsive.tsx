@@ -3,24 +3,20 @@ import { Dimensions, Platform } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
-// Device type detection
 export const isTablet = () => {
   const aspectRatio = height / width;
   return (
-    (Platform.OS === 'ios' && aspectRatio < 1.6) ||
+    (Platform.OS === 'ios' && aspectRatio < 1.5) ||
     (Platform.OS === 'android' && width >= 600)
   );
 };
 
-// Orientation detection
 export const isLandscape = () => width > height;
 export const isPortrait = () => height > width;
 
-// Screen dimensions
 export const screenWidth = width;
 export const screenHeight = height;
 
-// Responsive helpers
 export const wp = (percentage: number) => (width * percentage) / 100;
 export const hp = (percentage: number) => (height * percentage) / 100;
 
