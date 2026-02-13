@@ -5,27 +5,117 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
-import React, { FC, useState } from 'react';
+import React, { FC, useEffect, useState } from 'react';
 import { Colors } from '../../constants/Colors';
 import { FONTS } from '../../constants/Fonts';
-import { theme, isTablet, isLandscape, wp, hp } from '../../utils/responsive';
+import { wp, hp, isLandscape, isTablet, theme } from '../../utils/responsive';
 import PlayerControls from '../../components/PlayerControls';
-import ProgressBar from '../../components/ProgressBar';
+import Slider from '../../components/Slider';
+import TrackPlayer, {
+  usePlaybackState,
+  useProgress,
+  useActiveTrack,
+  State,
+} from 'react-native-track-player';
+
+// const musicPlaceHolder = require('../../assets/Images/musicPlaceHolderTransparent.png');
+
+import musicPlaceHolder from '../../assets/Images/musicPlaceHolderTransparent.png';
+
+interface MusicImageProps {
+  uri: string;
+  style: any;
+}
 
 interface PlayerScreenProps {
   navigation: any;
+  route: any;
 }
 
-const PlayerScreen: FC<PlayerScreenProps> = ({ navigation }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
+const MusicImage: FC<MusicImageProps> = ({ uri, style }) => {
+  const [hasError, setHasError] = useState(false);
+
+  return (
+    <Image
+      source={hasError || !uri ? musicPlaceHolder : { uri }}
+      style={style}
+      onError={() => setHasError(true)}
+    />
+  );
+};
+
+const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
+  const { track } = route.params || {};
+  const playbackState = usePlaybackState();
+  const progress = useProgress();
+  const activeTrack = useActiveTrack();
+
+  const isCurrentTrackActive = activeTrack?.id === track?.id;
+  const isPlaying =
+    isCurrentTrackActive && playbackState.state === State.Playing;
+
   const [isLooping, setIsLooping] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
 
+  useEffect(() => {
+    if (track && activeTrack !== undefined && track.id !== activeTrack?.id) {
+      const setup = async () => {
+        try {
+          await TrackPlayer.reset();
+          await TrackPlayer.add({
+            id: track.id,
+            url: track.url,
+            title: track.title,
+            artist: track.artist,
+            artwork: track.artwork || musicPlaceHolder,
+          });
+          await TrackPlayer.play();
+        } catch (err) {
+          console.log('Error in PlayerScreen setup:', err);
+        }
+      };
+      setup();
+    }
+  }, [track?.id, activeTrack?.id]);
+
+  const handlePlayPause = async () => {
+    if (isCurrentTrackActive) {
+      if (isPlaying) {
+        await TrackPlayer.pause();
+      } else {
+        await TrackPlayer.play();
+      }
+    } else {
+      await TrackPlayer.reset();
+      await TrackPlayer.add({
+        id: track.id,
+        url: track.url,
+        title: track.title,
+        artist: track.artist,
+        artwork: track.artwork || musicPlaceHolder,
+      });
+      await TrackPlayer.play();
+    }
+  };
+
   const handleBack = () => {
     navigation.goBack();
   };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const currentPosition = isCurrentTrackActive ? progress.position : 0;
+  const currentDuration = isCurrentTrackActive
+    ? progress.duration
+    : track?.duration || 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -35,7 +125,9 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation }) => {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.nowPlaying}>NOW PLAYING</Text>
-          <Text style={styles.trackTitle}>Deep Forest Serenity</Text>
+          <Text style={styles.trackTitle}>
+            {track?.title || 'Unknown Track'}
+          </Text>
         </View>
         <TouchableOpacity style={styles.headerButton}>
           <Text style={styles.headerIcon}>⋯</Text>
@@ -49,35 +141,61 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation }) => {
       >
         <View style={styles.content}>
           <View style={styles.albumArtContainer}>
-            <View style={styles.albumArt}>
-              <Text style={styles.albumEmoji}>🌲</Text>
-            </View>
+            <MusicImage uri={track?.artwork} style={styles.albumArtImage} />
 
             <TouchableOpacity
               style={styles.playPauseButton}
-              onPress={() => setIsPlaying(!isPlaying)}
+              onPress={handlePlayPause}
               activeOpacity={0.8}
             >
-              <Text style={styles.playPauseIcon}>{isPlaying ? '❚❚' : '▶'}</Text>
+              {playbackState.state === State.Buffering ||
+              playbackState.state === State.Loading ? (
+                <ActivityIndicator color={Colors.white} size="large" />
+              ) : (
+                <Text style={styles.playPauseIcon}>
+                  {isPlaying ? '❚❚' : '▶'}
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.timer}>10:00</Text>
-          <Text style={styles.breathingText}>Breathe in...</Text>
+          <Text style={styles.timer}>{formatTime(currentPosition)}</Text>
+          <Text style={styles.breathingText}>
+            {isPlaying ? 'Breathe with the sound...' : 'Paused'}
+          </Text>
 
           <View style={styles.progressContainer}>
-            <ProgressBar progress={0.33} height={4} />
+            <Slider
+              progress={
+                currentDuration > 0 ? currentPosition / currentDuration : 0
+              }
+              onSeek={() => {}}
+              onSlidingComplete={async value => {
+                if (isCurrentTrackActive && currentDuration > 0) {
+                  await TrackPlayer.seekTo(value * currentDuration);
+                }
+              }}
+              height={4}
+            />
             <View style={styles.timeLabels}>
-              <Text style={styles.timeLabel}>03:24</Text>
-              <Text style={styles.timeLabel}>10:00</Text>
+              <Text style={styles.timeLabel}>
+                {formatTime(currentPosition)}
+              </Text>
+              <Text style={styles.timeLabel}>
+                {formatTime(currentDuration)}
+              </Text>
             </View>
           </View>
 
           <PlayerControls
             isPlaying={isPlaying}
-            onPlayPause={() => setIsPlaying(!isPlaying)}
-            onSkipBackward={() => {}}
-            onSkipForward={() => {}}
+            onPlayPause={handlePlayPause}
+            onSkipBackward={() =>
+              isCurrentTrackActive && TrackPlayer.seekTo(progress.position - 10)
+            }
+            onSkipForward={() =>
+              isCurrentTrackActive && TrackPlayer.seekTo(progress.position + 10)
+            }
             onLoop={() => setIsLooping(!isLooping)}
             onSave={() => setIsSaved(!isSaved)}
             onOffline={() => setIsOffline(!isOffline)}
@@ -144,7 +262,7 @@ const styles = StyleSheet.create({
       isTablet() && isLandscape()
         ? theme.spacing.md
         : isTablet()
-        ? theme.spacing.lg
+        ? theme.spacing.sm * -1.5
         : theme.spacing.xl,
     minHeight: isTablet() && isLandscape() ? hp(85) : undefined,
   },
@@ -153,28 +271,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  albumArt: {
+  albumArtImage: {
     width: isTablet() && isLandscape() ? wp(30) : isTablet() ? wp(38) : wp(70),
     height: isTablet() && isLandscape() ? wp(30) : isTablet() ? wp(38) : wp(70),
-    borderRadius: theme.radius.full,
-    backgroundColor: '#4A5D3F',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.4,
-    shadowRadius: 40,
-    elevation: 10,
-  },
-  albumEmoji: {
-    fontSize:
-      isTablet() && isLandscape() ? wp(15) : isTablet() ? wp(19) : wp(35),
+    borderRadius: isTablet() ? theme.radius.xl : theme.radius.lg,
   },
   playPauseButton: {
     position: 'absolute',
     bottom: isTablet() ? -28 : -30,
-    width: isTablet() ? theme.icon.xxl * 1.4 : theme.icon.xxl * 1.5,
-    height: isTablet() ? theme.icon.xxl * 1.4 : theme.icon.xxl * 1.5,
+    width: isTablet() ? theme.icon.xxl * 1.2 : theme.icon.xxl * 1.5,
+    height: isTablet() ? theme.icon.xxl * 1.2 : theme.icon.xxl * 1.5,
     borderRadius: theme.radius.full,
     backgroundColor: Colors.primary,
     justifyContent: 'center',
@@ -194,7 +300,7 @@ const styles = StyleSheet.create({
     fontSize: isTablet() ? theme.font.xxxl * 1.6 : theme.font.xxxl * 1.5,
     color: Colors.textPrimary,
     textAlign: 'center',
-    marginTop: isTablet() ? theme.spacing.lg : theme.spacing.xl,
+    marginTop: isTablet() ? theme.spacing.md : theme.spacing.xl,
   },
   breathingText: {
     fontFamily: FONTS.Regular,
@@ -205,7 +311,8 @@ const styles = StyleSheet.create({
   },
   progressContainer: {
     paddingHorizontal: theme.spacing.md,
-    marginVertical: isTablet() ? theme.spacing.lg : theme.spacing.xl,
+    marginTop: isTablet() ? theme.spacing.md : theme.spacing.xl,
+    marginBottom: isTablet() ? theme.spacing.sm : theme.spacing.sm * 1.5,
   },
   timeLabels: {
     flexDirection: 'row',

@@ -13,26 +13,61 @@ import { FONTS } from '../../constants/Fonts';
 import { theme } from '../../utils/responsive';
 import SessionListItem from '../../components/SessionListItem';
 import ProgressBar from '../../components/ProgressBar';
+import TrackPlayer, {
+  useActiveTrack,
+  usePlaybackState,
+  State,
+} from 'react-native-track-player';
+import musicData from '../../constants/musicData.json';
 
 interface LibraryScreenProps {
   navigation: any;
 }
 
 const LibraryScreen: FC<LibraryScreenProps> = ({ navigation }) => {
-  const handlePlaySession = () => {
-    navigation.navigate('PlayerScreen');
+  const activeTrack = useActiveTrack();
+  const playbackState = usePlaybackState();
+  const isPlaying = playbackState.state === State.Playing;
+  const isBuffering =
+    playbackState.state === State.Buffering ||
+    playbackState.state === State.Loading;
+  const musicPlaceHolder = require('../../assets/Images/musicPlaceHolderTransparent.png');
+
+  const handleTrackSelect = async (item: any) => {
+    const shouldNavigate = !activeTrack;
+
+    if (activeTrack?.id === item.id) {
+      await TrackPlayer.play();
+      if (shouldNavigate) {
+        navigation.navigate('PlayerScreen', { track: item });
+      }
+      return;
+    }
+
+    try {
+      await TrackPlayer.reset();
+      await TrackPlayer.add({
+        id: item.id,
+        url: item.url,
+        title: item.title,
+        artist: item.artist,
+        artwork: item.artwork || musicPlaceHolder,
+      });
+
+      await TrackPlayer.play();
+      if (shouldNavigate) {
+        navigation.navigate('PlayerScreen', { track: item });
+      }
+    } catch (e) {
+      console.log('Error starting track in LibraryScreen:', e);
+    }
   };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton}>
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>Downloads</Text>
-        <TouchableOpacity>
-          <Text style={styles.editButton}>Edit</Text>
-        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -50,31 +85,28 @@ const LibraryScreen: FC<LibraryScreenProps> = ({ navigation }) => {
           />
         </View>
 
-        {/* Storage Used */}
-        <View style={styles.storageContainer}>
-          <View style={styles.storageHeader}>
-            <Text style={styles.storageLabel}>STORAGE USED</Text>
-            <Text style={styles.storageValue}>1.2 GB of 5 GB</Text>
-          </View>
-          <ProgressBar progress={0.24} height={6} />
-        </View>
-
         {/* Recently Saved */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>RECENTLY SAVED</Text>
           <SessionListItem
-            image={{ uri: 'https://via.placeholder.com/60' }}
-            title="Forest Walk for Anxiety"
+            image={{ uri: musicData[2].artwork }}
+            title={musicData[2].title}
             duration="15 min"
             fileSize="12.4 MB"
-            onPlayPress={handlePlaySession}
+            onPlayPress={() => handleTrackSelect(musicData[2])}
+            isPlaying={isPlaying && activeTrack?.id === musicData[2].id}
+            isActive={activeTrack?.id === musicData[2].id}
+            isLoading={isBuffering && activeTrack?.id === musicData[2].id}
           />
           <SessionListItem
-            image={{ uri: 'https://via.placeholder.com/60' }}
-            title="Ocean Waves Sleep"
-            duration="45 min"
+            image={{ uri: musicData[3].artwork }}
+            title={musicData[3].title}
+            duration="10 min"
             fileSize="38.1 MB"
-            onPlayPress={handlePlaySession}
+            onPlayPress={() => handleTrackSelect(musicData[3])}
+            isPlaying={isPlaying && activeTrack?.id === musicData[3].id}
+            isActive={activeTrack?.id === musicData[3].id}
+            isLoading={isBuffering && activeTrack?.id === musicData[3].id}
           />
         </View>
 
@@ -82,25 +114,34 @@ const LibraryScreen: FC<LibraryScreenProps> = ({ navigation }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>LAST WEEK</Text>
           <SessionListItem
-            image={{ uri: 'https://via.placeholder.com/60' }}
-            title="Morning Clarity"
+            image={{ uri: musicData[0].artwork }}
+            title={musicData[0].title}
             duration="10 min"
             fileSize="8.9 MB"
-            onPlayPress={handlePlaySession}
+            onPlayPress={() => handleTrackSelect(musicData[0])}
+            isPlaying={isPlaying && activeTrack?.id === musicData[0].id}
+            isActive={activeTrack?.id === musicData[0].id}
+            isLoading={isBuffering && activeTrack?.id === musicData[0].id}
           />
           <SessionListItem
-            image={{ uri: 'https://via.placeholder.com/60' }}
-            title="Stress Release Breath..."
+            image={{ uri: musicData[1].artwork }}
+            title={musicData[1].title}
             duration="20 min"
             fileSize="16.5 MB"
-            onPlayPress={handlePlaySession}
+            onPlayPress={() => handleTrackSelect(musicData[1])}
+            isPlaying={isPlaying && activeTrack?.id === musicData[1].id}
+            isActive={activeTrack?.id === musicData[1].id}
+            isLoading={isBuffering && activeTrack?.id === musicData[1].id}
           />
           <SessionListItem
-            image={{ uri: 'https://via.placeholder.com/60' }}
-            title="Midnight Reflection"
+            image={{ uri: musicData[4].artwork }}
+            title={musicData[4].title}
             duration="30 min"
             fileSize="24.2 MB"
-            onPlayPress={handlePlaySession}
+            onPlayPress={() => handleTrackSelect(musicData[4])}
+            isPlaying={isPlaying && activeTrack?.id === musicData[4].id}
+            isActive={activeTrack?.id === musicData[4].id}
+            isLoading={isBuffering && activeTrack?.id === musicData[4].id}
           />
         </View>
 
@@ -120,7 +161,7 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: theme.layout.containerPadding,
     paddingVertical: theme.spacing.md,

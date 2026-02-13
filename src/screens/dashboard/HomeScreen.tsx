@@ -5,19 +5,35 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import React, { FC } from 'react';
 import { Colors } from '../../constants/Colors';
 import { FONTS } from '../../constants/Fonts';
-import { theme, isTablet, isLandscape, wp } from '../../utils/responsive';
+import { theme, wp } from '../../utils/responsive';
 import FocusAreaIcon from '../../components/FocusAreaIcon';
 import LinearGradient from 'react-native-linear-gradient';
+import TrackPlayer, {
+  useActiveTrack,
+  usePlaybackState,
+  State,
+} from 'react-native-track-player';
+import musicData from '../../constants/musicData.json';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 interface HomeScreenProps {
   navigation: any;
 }
 
 const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
+  const activeTrack = useActiveTrack();
+  const playbackState = usePlaybackState();
+  const isPlaying = playbackState.state === State.Playing;
+  const isBuffering =
+    playbackState.state === State.Buffering ||
+    playbackState.state === State.Loading;
+  const musicPlaceHolder = require('../../assets/Images/musicPlaceHolderTransparent.png');
+
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good Morning';
@@ -25,8 +41,34 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
     return 'Good Evening';
   };
 
-  const handlePlaySession = () => {
-    navigation.navigate('PlayerScreen');
+  const handleTrackSelect = async (item: any) => {
+    const shouldNavigate = !activeTrack;
+
+    if (activeTrack?.id === item.id) {
+      await TrackPlayer.play();
+      if (shouldNavigate) {
+        navigation.navigate('PlayerScreen', { track: item });
+      }
+      return;
+    }
+
+    try {
+      await TrackPlayer.reset();
+      await TrackPlayer.add({
+        id: item.id,
+        url: item.url,
+        title: item.title,
+        artist: item.artist,
+        artwork: item.artwork || musicPlaceHolder,
+      });
+
+      await TrackPlayer.play();
+      if (shouldNavigate) {
+        navigation.navigate('PlayerScreen', { track: item });
+      }
+    } catch (e) {
+      console.log('Error in handleTrackSelect:', e);
+    }
   };
 
   return (
@@ -52,7 +94,10 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
           colors={[Colors.gradientStart, Colors.gradientEnd]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.dailySessionCard}
+          style={[
+            styles.dailySessionCard,
+            activeTrack?.id === musicData[0].id && styles.activeDailySession,
+          ]}
         >
           <View style={styles.dailySessionContent}>
             <Text style={styles.dailySessionLabel}>DAILY SESSION</Text>
@@ -65,10 +110,33 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
             <TouchableOpacity
               style={styles.startButton}
               activeOpacity={0.8}
-              onPress={handlePlaySession}
+              onPress={() => handleTrackSelect(musicData[0])}
             >
-              <Text style={styles.startButtonIcon}>▶</Text>
-              <Text style={styles.startButtonText}>Start Now</Text>
+              {activeTrack?.id === musicData[0].id && isBuffering ? (
+                <ActivityIndicator
+                  color={Colors.primary}
+                  size="small"
+                  style={{ marginRight: 6 }}
+                />
+              ) : (
+                <Icon
+                  name={
+                    isPlaying && activeTrack?.id === musicData[0].id
+                      ? 'pause'
+                      : 'play'
+                  }
+                  size={16}
+                  color={Colors.primary}
+                  style={{ marginRight: 6 }}
+                />
+              )}
+              <Text style={styles.startButtonText}>
+                {activeTrack?.id === musicData[0].id && isBuffering
+                  ? 'Loading...'
+                  : isPlaying && activeTrack?.id === musicData[0].id
+                  ? 'Playing'
+                  : 'Start Now'}
+              </Text>
             </TouchableOpacity>
           </View>
           <View style={styles.dailySessionImage}>
@@ -95,12 +163,25 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
         {/* Continue Last Session */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Continue last session</Text>
-          <View style={styles.continueSessionCard}>
+          <View
+            style={[
+              styles.continueSessionCard,
+              activeTrack?.id === musicData[1].id &&
+                styles.activeContinueSession,
+            ]}
+          >
             <View style={styles.continueSessionThumbnail}>
               <Text style={styles.thumbnailEmoji}>🌲</Text>
             </View>
             <View style={styles.continueSessionInfo}>
-              <Text style={styles.continueSessionTitle}>Forest Whispers</Text>
+              <Text
+                style={[
+                  styles.continueSessionTitle,
+                  activeTrack?.id === musicData[1].id && styles.activeItemText,
+                ]}
+              >
+                {musicData[1].title}
+              </Text>
               <Text style={styles.continueSessionSubtitle}>
                 Deep Relaxation • 22 min left
               </Text>
@@ -110,9 +191,21 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
             </View>
             <TouchableOpacity
               style={styles.playButtonSmall}
-              onPress={handlePlaySession}
+              onPress={() => handleTrackSelect(musicData[1])}
             >
-              <Text style={styles.playIconSmall}>▶</Text>
+              {activeTrack?.id === musicData[1].id && isBuffering ? (
+                <ActivityIndicator color={Colors.white} size="small" />
+              ) : (
+                <Icon
+                  name={
+                    isPlaying && activeTrack?.id === musicData[1].id
+                      ? 'pause'
+                      : 'play'
+                  }
+                  size={20}
+                  color={Colors.white}
+                />
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -322,10 +415,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: theme.spacing.sm,
   },
-  playIconSmall: {
-    fontSize: theme.font.md,
-    color: Colors.white,
-    marginLeft: 2,
+  activeDailySession: {
+    borderColor: Colors.white,
+    borderWidth: 2,
+  },
+  activeContinueSession: {
+    borderColor: Colors.primary,
+    borderWidth: 1.5,
+  },
+  activeItemText: {
+    color: Colors.primary,
   },
   mindfulMomentsGrid: {
     flexDirection: 'row',

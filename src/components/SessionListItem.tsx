@@ -6,10 +6,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   ImageSourcePropType,
+  ActivityIndicator,
 } from 'react-native';
 import { Colors } from '../constants/Colors';
 import { FONTS } from '../constants/Fonts';
 import { theme } from '../utils/responsive';
+
+import Icon from 'react-native-vector-icons/Ionicons';
 
 interface SessionListItemProps {
   image: ImageSourcePropType;
@@ -18,6 +21,9 @@ interface SessionListItemProps {
   fileSize: string;
   onPress?: () => void;
   onPlayPress?: () => void;
+  isPlaying?: boolean;
+  isActive?: boolean;
+  isLoading?: boolean;
 }
 
 const SessionListItem: FC<SessionListItemProps> = ({
@@ -27,16 +33,22 @@ const SessionListItem: FC<SessionListItemProps> = ({
   fileSize,
   onPress,
   onPlayPress,
+  isPlaying,
+  isActive,
+  isLoading,
 }) => {
   return (
     <TouchableOpacity
-      style={styles.container}
+      style={[styles.container, isActive && styles.activeContainer]}
       onPress={onPress}
       activeOpacity={0.8}
     >
       <Image source={image} style={styles.thumbnail} />
       <View style={styles.infoContainer}>
-        <Text style={styles.title} numberOfLines={1}>
+        <Text
+          style={[styles.title, isActive && styles.activeTitle]}
+          numberOfLines={1}
+        >
           {title}
         </Text>
         <View style={styles.metaContainer}>
@@ -45,11 +57,19 @@ const SessionListItem: FC<SessionListItemProps> = ({
         </View>
       </View>
       <TouchableOpacity
-        style={styles.playButton}
+        style={[styles.playButton, isActive && styles.activePlayButton]}
         onPress={onPlayPress}
         activeOpacity={0.7}
       >
-        <Text style={styles.playIcon}>▶</Text>
+        {isLoading ? (
+          <ActivityIndicator color={Colors.white} size="small" />
+        ) : (
+          <Icon
+            name={isPlaying ? 'pause' : 'play'}
+            size={20}
+            color={Colors.white}
+          />
+        )}
       </TouchableOpacity>
     </TouchableOpacity>
   );
@@ -104,10 +124,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: theme.spacing.sm,
   },
+  activeContainer: {
+    borderColor: Colors.primary,
+    borderWidth: 1,
+  },
+  activeTitle: {
+    color: Colors.primary,
+  },
+  activePlayButton: {
+    backgroundColor: Colors.primary,
+  },
   playIcon: {
     fontSize: theme.font.md,
     color: Colors.white,
-    marginLeft: 2,
   },
 });
 
