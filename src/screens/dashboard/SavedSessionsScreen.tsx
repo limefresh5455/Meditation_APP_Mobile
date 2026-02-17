@@ -20,17 +20,14 @@ import TrackPlayer, {
 } from 'react-native-track-player';
 import musicData from '../../constants/musicData.json';
 import { useAppSelector } from '../../redux/reduxHook';
-import {
-  selectSavedTrackIds,
-  selectOfflineTrackIds,
-} from '../../redux/reducers/musicSlice';
+import { selectSavedTrackIds } from '../../redux/reducers/musicSlice';
 import { verifyLocalFile } from '../../services/DownloadService';
 
-interface LibraryScreenProps {
+interface SavedSessionsScreenProps {
   navigation: any;
 }
 
-const LibraryScreen: FC<LibraryScreenProps> = ({ navigation }) => {
+const SavedSessionsScreen: FC<SavedSessionsScreenProps> = ({ navigation }) => {
   const activeTrack = useActiveTrack();
   const playbackState = usePlaybackState();
   const isPlaying = playbackState.state === State.Playing;
@@ -41,13 +38,13 @@ const LibraryScreen: FC<LibraryScreenProps> = ({ navigation }) => {
 
   const [searchQuery, setSearchQuery] = useState('');
 
-  const offlineTrackIds = useAppSelector(selectOfflineTrackIds) || [];
+  const savedTrackIds = useAppSelector(selectSavedTrackIds) || [];
 
-  const offlineTracks = musicData.filter(track =>
-    offlineTrackIds.includes(track.id),
+  const savedTracks = musicData.filter(track =>
+    savedTrackIds.includes(track.id),
   );
 
-  const filteredTracks = offlineTracks.filter(
+  const filteredTracks = savedTracks.filter(
     track =>
       track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       track.artist.toLowerCase().includes(searchQuery.toLowerCase()),
@@ -73,7 +70,7 @@ const LibraryScreen: FC<LibraryScreenProps> = ({ navigation }) => {
 
       const verifiedPath = await verifyLocalFile(item.id);
       const playbackUrl = verifiedPath || item.url;
-      console.log('Library: Setting up track with URL:', playbackUrl);
+      console.log('Saved: Setting up track with URL:', playbackUrl);
 
       await TrackPlayer.add({
         id: item.id,
@@ -88,14 +85,14 @@ const LibraryScreen: FC<LibraryScreenProps> = ({ navigation }) => {
         navigation.navigate('PlayerScreen', { track: item });
       }
     } catch (e) {
-      console.log('Error starting track in LibraryScreen:', e);
+      console.log('Error starting track in SavedSessionsScreen:', e);
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Downloads</Text>
+        <Text style={styles.headerTitle}>Saved Sessions</Text>
       </View>
 
       <ScrollView
@@ -115,31 +112,32 @@ const LibraryScreen: FC<LibraryScreenProps> = ({ navigation }) => {
           />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search your downloads..."
+            placeholder="Search your saved sessions..."
             placeholderTextColor={Colors.textTertiary}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
         </View>
 
-        {offlineTracks.length === 0 ? (
+        {savedTracks.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Icon
-              name="cloud-download-outline"
+              name="heart-outline"
               size={wp(20)}
               color={Colors.border}
               style={styles.emptyIcon}
             />
-            <Text style={styles.emptyTitle}>No downloads yet</Text>
+            <Text style={styles.emptyTitle}>Nothing saved yet</Text>
             <Text style={styles.emptySubtitle}>
-              Sessions you download for offline listening will appear here.
+              Sessions you save by tapping the heart icon will appear here for
+              quick access.
             </Text>
             <TouchableOpacity
               style={[styles.browseButton, { width: '80%', marginTop: 30 }]}
               activeOpacity={0.8}
               onPress={() => navigation.navigate('Explore')}
             >
-              <Text style={styles.browseButtonText}>Browse Content</Text>
+              <Text style={styles.browseButtonText}>Discover Sessions</Text>
             </TouchableOpacity>
           </View>
         ) : filteredTracks.length === 0 ? (
@@ -152,7 +150,7 @@ const LibraryScreen: FC<LibraryScreenProps> = ({ navigation }) => {
             />
             <Text style={styles.emptyTitle}>No results found</Text>
             <Text style={styles.emptySubtitle}>
-              We couldn't find any downloads matching "{searchQuery}"
+              We couldn't find any saved sessions matching "{searchQuery}"
             </Text>
             <TouchableOpacity
               style={[styles.browseButton, { width: '60%', marginTop: 20 }]}
@@ -165,7 +163,7 @@ const LibraryScreen: FC<LibraryScreenProps> = ({ navigation }) => {
         ) : (
           <>
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>DOWNLOADED SESSIONS</Text>
+              <Text style={styles.sectionTitle}>FAVORITE SESSIONS</Text>
               {filteredTracks.map(track => (
                 <SessionListItem
                   key={track.id}
@@ -207,22 +205,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.layout.containerPadding,
     paddingVertical: theme.spacing.md,
   },
-  backButton: {
-    width: theme.icon.lg,
-  },
-  backIcon: {
-    fontSize: theme.font.xxl,
-    color: Colors.primary,
-  },
   headerTitle: {
     fontFamily: FONTS.Bold,
     fontSize: theme.font.lg,
     color: Colors.textPrimary,
-  },
-  editButton: {
-    fontFamily: FONTS.SemiBold,
-    fontSize: theme.font.md,
-    color: Colors.primary,
   },
   scrollView: {
     flex: 1,
@@ -249,29 +235,6 @@ const styles = StyleSheet.create({
     fontSize: theme.font.md,
     color: Colors.textPrimary,
   },
-  storageContainer: {
-    backgroundColor: Colors.cardBackground,
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.xl,
-  },
-  storageHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.sm,
-  },
-  storageLabel: {
-    fontFamily: FONTS.SemiBold,
-    fontSize: theme.font.xs,
-    color: Colors.textSecondary,
-    letterSpacing: 1,
-  },
-  storageValue: {
-    fontFamily: FONTS.SemiBold,
-    fontSize: theme.font.xs,
-    color: Colors.accentPurple,
-  },
   section: {
     marginBottom: theme.spacing.xl,
   },
@@ -294,13 +257,6 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.SemiBold,
     fontSize: theme.font.md,
     color: Colors.primary,
-  },
-  emptyText: {
-    fontFamily: FONTS.Regular,
-    fontSize: theme.font.sm,
-    color: Colors.textTertiary,
-    textAlign: 'center',
-    marginVertical: theme.spacing.lg,
   },
   emptyContainer: {
     flex: 1,
@@ -328,4 +284,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LibraryScreen;
+export default SavedSessionsScreen;

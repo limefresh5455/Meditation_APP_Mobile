@@ -102,7 +102,7 @@ const Slider: FC<SliderProps> = ({
               height: height * 3,
               borderRadius: (height * 3) / 2,
               marginLeft: -(height * 1.5),
-              marginTop: -height,
+              marginTop: -(height * 3) / 2,
             },
           ]}
         />

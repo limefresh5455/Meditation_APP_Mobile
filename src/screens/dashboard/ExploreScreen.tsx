@@ -19,6 +19,8 @@ import TrackPlayer, {
   State,
 } from 'react-native-track-player';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useAppSelector } from '../../redux/reduxHook';
+import { verifyLocalFile } from '../../services/DownloadService';
 
 const musicPlaceHolder = require('../../assets/Images/musicPlaceHolderTransparent.png');
 
@@ -55,7 +57,11 @@ const ExploreScreen: FC<ExploreScreenProps> = ({ navigation }) => {
     const shouldNavigate = !activeTrack;
 
     if (activeTrack?.id === item.id) {
-      await TrackPlayer.play();
+      if (isPlaying) {
+        await TrackPlayer.pause();
+      } else {
+        await TrackPlayer.play();
+      }
       if (shouldNavigate) {
         navigation.navigate('PlayerScreen', { track: item });
       }
@@ -64,9 +70,14 @@ const ExploreScreen: FC<ExploreScreenProps> = ({ navigation }) => {
 
     try {
       await TrackPlayer.reset();
+
+      const verifiedPath = await verifyLocalFile(item.id);
+      const playbackUrl = verifiedPath || item.url;
+      console.log('Explore: Setting up track with URL:', playbackUrl);
+
       await TrackPlayer.add({
         id: item.id,
-        url: item.url,
+        url: playbackUrl,
         title: item.title,
         artist: item.artist,
         artwork: item.artwork || musicPlaceHolder,

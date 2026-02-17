@@ -5,7 +5,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import HomeScreen from '../screens/dashboard/HomeScreen';
 import ExploreScreen from '../screens/dashboard/ExploreScreen';
 import LibraryScreen from '../screens/dashboard/LibraryScreen';
-import ProfileScreen from '../screens/dashboard/ProfileScreen';
+import SavedSessionsScreen from '../screens/dashboard/SavedSessionsScreen';
 import { Colors } from '../constants/Colors';
 import { FONTS } from '../constants/Fonts';
 import { isTablet, theme } from '../utils/responsive';
@@ -71,9 +71,10 @@ const BottomTab: FC = () => {
           name="Library"
           component={LibraryScreen}
           options={{
+            tabBarLabel: 'Downloads',
             tabBarIcon: ({ focused, color }) => (
               <Icon
-                name={focused ? 'library' : 'library-outline'}
+                name={focused ? 'download' : 'download-outline'}
                 size={iconSize}
                 color={color}
               />
@@ -81,12 +82,13 @@ const BottomTab: FC = () => {
           }}
         />
         <Tab.Screen
-          name="Profile"
-          component={ProfileScreen}
+          name="Saved"
+          component={SavedSessionsScreen}
           options={{
+            tabBarLabel: 'Saved',
             tabBarIcon: ({ focused, color }) => (
               <Icon
-                name={focused ? 'person' : 'person-outline'}
+                name={focused ? 'heart' : 'heart-outline'}
                 size={iconSize}
                 color={color}
               />

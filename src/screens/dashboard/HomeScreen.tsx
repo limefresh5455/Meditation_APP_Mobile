@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import React, { FC } from 'react';
 import { Colors } from '../../constants/Colors';
@@ -20,6 +21,12 @@ import TrackPlayer, {
 } from 'react-native-track-player';
 import musicData from '../../constants/musicData.json';
 import Icon from 'react-native-vector-icons/Ionicons';
+import {
+  selectLastPlayedTrack,
+  selectPlaybackPosition,
+} from '../../redux/reducers/musicSlice';
+import { useAppSelector } from '../../redux/reduxHook';
+import { verifyLocalFile } from '../../services/DownloadService';
 
 interface HomeScreenProps {
   navigation: any;
@@ -28,6 +35,9 @@ interface HomeScreenProps {
 const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
   const activeTrack = useActiveTrack();
   const playbackState = usePlaybackState();
+  const lastPlayedTrack = useAppSelector(selectLastPlayedTrack);
+  const playbackPosition = useAppSelector(selectPlaybackPosition);
+
   const isPlaying = playbackState.state === State.Playing;
   const isBuffering =
     playbackState.state === State.Buffering ||
@@ -41,11 +51,15 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
     return 'Good Evening';
   };
 
-  const handleTrackSelect = async (item: any) => {
-    const shouldNavigate = !activeTrack;
+  const handleTrackSelect = async (item: any, resumePosition?: number) => {
+    const shouldNavigate = !activeTrack || activeTrack.id !== item.id;
 
     if (activeTrack?.id === item.id) {
-      await TrackPlayer.play();
+      if (isPlaying) {
+        await TrackPlayer.pause();
+      } else {
+        await TrackPlayer.play();
+      }
       if (shouldNavigate) {
         navigation.navigate('PlayerScreen', { track: item });
       }
@@ -54,15 +68,25 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
 
     try {
       await TrackPlayer.reset();
+
+      const verifiedPath = await verifyLocalFile(item.id);
+      const playbackUrl = verifiedPath || item.url;
+      console.log('Home: Setting up track with URL:', playbackUrl);
+
       await TrackPlayer.add({
         id: item.id,
-        url: item.url,
+        url: playbackUrl,
         title: item.title,
         artist: item.artist,
         artwork: item.artwork || musicPlaceHolder,
       });
 
       await TrackPlayer.play();
+
+      if (resumePosition && resumePosition > 0) {
+        await TrackPlayer.seekTo(resumePosition);
+      }
+
       if (shouldNavigate) {
         navigation.navigate('PlayerScreen', { track: item });
       }
@@ -78,18 +102,20 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>{getGreeting()}</Text>
             <Text style={styles.subtitle}>Take a deep breath and relax.</Text>
           </View>
           <TouchableOpacity style={styles.notificationButton}>
-            <Text style={styles.notificationIcon}>🔔</Text>
+            <Icon
+              name="notifications-outline"
+              size={wp(5.5)}
+              color={Colors.textPrimary}
+            />
           </TouchableOpacity>
         </View>
 
-        {/* Daily Session Card */}
         <LinearGradient
           colors={[Colors.gradientStart, Colors.gradientEnd]}
           start={{ x: 0, y: 0 }}
@@ -144,7 +170,6 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </LinearGradient>
 
-        {/* Focus Areas */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Focus Areas</Text>
@@ -160,75 +185,133 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Continue Last Session */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Continue last session</Text>
-          <View
-            style={[
-              styles.continueSessionCard,
-              activeTrack?.id === musicData[1].id &&
-                styles.activeContinueSession,
-            ]}
-          >
-            <View style={styles.continueSessionThumbnail}>
-              <Text style={styles.thumbnailEmoji}>🌲</Text>
-            </View>
-            <View style={styles.continueSessionInfo}>
-              <Text
-                style={[
-                  styles.continueSessionTitle,
-                  activeTrack?.id === musicData[1].id && styles.activeItemText,
-                ]}
-              >
-                {musicData[1].title}
-              </Text>
-              <Text style={styles.continueSessionSubtitle}>
-                Deep Relaxation • 22 min left
-              </Text>
-              <View style={styles.progressBarContainer}>
-                <View style={styles.progressBar} />
-              </View>
-            </View>
-            <TouchableOpacity
-              style={styles.playButtonSmall}
-              onPress={() => handleTrackSelect(musicData[1])}
+        {lastPlayedTrack && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Continue last session</Text>
+            <View
+              style={[
+                styles.continueSessionCard,
+                activeTrack?.id === lastPlayedTrack.id &&
+                  styles.activeContinueSession,
+              ]}
             >
-              {activeTrack?.id === musicData[1].id && isBuffering ? (
-                <ActivityIndicator color={Colors.white} size="small" />
-              ) : (
-                <Icon
-                  name={
-                    isPlaying && activeTrack?.id === musicData[1].id
-                      ? 'pause'
-                      : 'play'
+              <View style={styles.continueSessionThumbnail}>
+                <Image
+                  source={
+                    lastPlayedTrack.artwork
+                      ? { uri: lastPlayedTrack.artwork }
+                      : musicPlaceHolder
                   }
-                  size={20}
-                  color={Colors.white}
+                  style={styles.continueSessionImage}
                 />
-              )}
-            </TouchableOpacity>
+              </View>
+              <View style={styles.continueSessionInfo}>
+                <Text
+                  style={[
+                    styles.continueSessionTitle,
+                    activeTrack?.id === lastPlayedTrack.id &&
+                      styles.activeItemText,
+                  ]}
+                >
+                  {lastPlayedTrack.title}
+                </Text>
+                <Text style={styles.continueSessionSubtitle}>
+                  {lastPlayedTrack.artist} •{' '}
+                  {lastPlayedTrack.duration
+                    ? `${Math.max(
+                        0,
+                        Math.floor(
+                          (lastPlayedTrack.duration - playbackPosition) / 60,
+                        ),
+                      )} min left`
+                    : 'Resuming...'}
+                </Text>
+                <View style={styles.progressBarContainer}>
+                  <View
+                    style={[
+                      styles.progressBar,
+                      {
+                        width: lastPlayedTrack.duration
+                          ? `${
+                              (playbackPosition / lastPlayedTrack.duration) *
+                              100
+                            }%`
+                          : '0%',
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
+              <TouchableOpacity
+                style={styles.playButtonSmall}
+                onPress={() =>
+                  handleTrackSelect(
+                    lastPlayedTrack,
+                    activeTrack?.id === lastPlayedTrack.id
+                      ? undefined
+                      : playbackPosition,
+                  )
+                }
+              >
+                {activeTrack?.id === lastPlayedTrack.id && isBuffering ? (
+                  <ActivityIndicator color={Colors.white} size="small" />
+                ) : (
+                  <Icon
+                    name={
+                      isPlaying && activeTrack?.id === lastPlayedTrack.id
+                        ? 'pause'
+                        : 'play'
+                    }
+                    size={20}
+                    color={Colors.white}
+                  />
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        )}
 
-        {/* Mindful Moments */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Mindful Moments</Text>
-          <View style={styles.mindfulMomentsGrid}>
-            <View style={styles.mindfulCard}>
-              <View style={styles.mindfulCardImage}>
-                <Text style={styles.mindfulEmoji}>🌊</Text>
-              </View>
-              <Text style={styles.mindfulCardTitle}>Tidal Flow</Text>
-              <Text style={styles.mindfulCardSubtitle}>5 MIN • FOCUS</Text>
-            </View>
-            <View style={styles.mindfulCard}>
-              <View style={styles.mindfulCardImage}>
-                <Text style={styles.mindfulEmoji}>🪴</Text>
-              </View>
-              <Text style={styles.mindfulCardTitle}>Zen Garden</Text>
-              <Text style={styles.mindfulCardSubtitle}>15 MIN • RELAX</Text>
-            </View>
-          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.mindfulMomentsScroll}
+          >
+            {musicData.slice(2, 8).map(item => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.mindfulCard}
+                activeOpacity={0.9}
+                onPress={() => handleTrackSelect(item)}
+              >
+                <View style={styles.mindfulCardImageContainer}>
+                  <Image
+                    source={{ uri: item.artwork }}
+                    style={styles.mindfulCardImage}
+                  />
+                  <View style={styles.mindfulCardOverlay}>
+                    {activeTrack?.id === item.id && isPlaying ? (
+                      <Icon
+                        name="pause-circle"
+                        size={32}
+                        color={Colors.white}
+                      />
+                    ) : (
+                      <Icon name="play-circle" size={32} color={Colors.white} />
+                    )}
+                  </View>
+                </View>
+                <Text style={styles.mindfulCardTitle} numberOfLines={1}>
+                  {item.title}
+                </Text>
+                <Text style={styles.mindfulCardSubtitle}>
+                  {Math.floor(item.duration / 60)} MIN •{' '}
+                  {item.genre?.toUpperCase() || 'RELAX'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -272,9 +355,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.cardBackground,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  notificationIcon: {
-    fontSize: theme.font.lg,
   },
   dailySessionCard: {
     marginHorizontal: theme.layout.containerPadding,
@@ -372,9 +452,13 @@ const styles = StyleSheet.create({
     width: theme.image.small,
     height: theme.image.small,
     borderRadius: theme.radius.sm,
-    backgroundColor: '#D4C5A0',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: Colors.cardBackgroundLight,
+    overflow: 'hidden',
+  },
+  continueSessionImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   thumbnailEmoji: {
     fontSize: theme.font.xxl,
@@ -426,24 +510,32 @@ const styles = StyleSheet.create({
   activeItemText: {
     color: Colors.primary,
   },
-  mindfulMomentsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  mindfulMomentsScroll: {
+    paddingRight: theme.layout.containerPadding,
   },
   mindfulCard: {
-    width: '48%',
+    width: wp(40),
+    marginRight: theme.spacing.md,
   },
-  mindfulCardImage: {
+  mindfulCardImageContainer: {
     width: '100%',
     aspectRatio: 1,
     borderRadius: theme.radius.md,
     backgroundColor: Colors.cardBackground,
+    overflow: 'hidden',
+    marginBottom: theme.spacing.sm,
+    position: 'relative',
+  },
+  mindfulCardImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  mindfulCardOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: theme.spacing.sm,
-  },
-  mindfulEmoji: {
-    fontSize: wp(15),
   },
   mindfulCardTitle: {
     fontFamily: FONTS.SemiBold,
