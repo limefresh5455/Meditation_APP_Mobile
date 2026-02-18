@@ -19,7 +19,7 @@ import TrackPlayer, {
   usePlaybackState,
   State,
 } from 'react-native-track-player';
-import musicData from '../../constants/musicData.json';
+import musicData from '../../constants/musicData';
 import Icon from 'react-native-vector-icons/Ionicons';
 import {
   selectLastPlayedTrack,
@@ -69,17 +69,33 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
     try {
       await TrackPlayer.reset();
 
-      const verifiedPath = await verifyLocalFile(item.id);
-      const playbackUrl = verifiedPath || item.url;
-      console.log('Home: Setting up track with URL:', playbackUrl);
+      if (item.isComposite && item.blocks) {
+        const trackList = await Promise.all(
+          item.blocks.map(async (block: any) => {
+            const verifiedPath = await verifyLocalFile(block.id);
+            return {
+              id: block.id,
+              url: verifiedPath || block.url,
+              title: block.title,
+              artist: block.artist,
+              artwork: block.artwork || musicPlaceHolder,
+            };
+          }),
+        );
+        await TrackPlayer.add(trackList);
+      } else {
+        const verifiedPath = await verifyLocalFile(item.id);
+        const playbackUrl = verifiedPath || item.url;
+        console.log('Home: Setting up track with URL:', playbackUrl);
 
-      await TrackPlayer.add({
-        id: item.id,
-        url: playbackUrl,
-        title: item.title,
-        artist: item.artist,
-        artwork: item.artwork || musicPlaceHolder,
-      });
+        await TrackPlayer.add({
+          id: item.id,
+          url: playbackUrl,
+          title: item.title,
+          artist: item.artist,
+          artwork: item.artwork || musicPlaceHolder,
+        });
+      }
 
       await TrackPlayer.play();
 

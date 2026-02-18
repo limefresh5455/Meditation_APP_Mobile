@@ -13,9 +13,11 @@ interface PlayerControlsProps {
   onLoop?: () => void;
   onSave?: () => void;
   onOffline?: () => void;
+  onFocus?: () => void;
   isLooping?: boolean;
   isSaved?: boolean;
   isOffline?: boolean;
+  isFocusVisible?: boolean;
 }
 
 const PlayerControls: FC<PlayerControlsProps> = ({
@@ -26,9 +28,11 @@ const PlayerControls: FC<PlayerControlsProps> = ({
   onLoop,
   onSave,
   onOffline,
+  onFocus,
   isLooping = false,
   isSaved = false,
   isOffline = false,
+  isFocusVisible = false,
 }) => {
   return (
     <View style={styles.container}>
@@ -41,6 +45,16 @@ const PlayerControls: FC<PlayerControlsProps> = ({
           <Text style={styles.skipIcon}>↺</Text>
           <Text style={styles.skipText}>15</Text>
         </TouchableOpacity>
+
+        {isFocusVisible && (
+          <TouchableOpacity
+            style={styles.focusButton}
+            onPress={onFocus}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.focusButtonText}>Focus</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={styles.skipButton}
@@ -145,6 +159,20 @@ const styles = StyleSheet.create({
   },
   activeLabel: {
     color: Colors.primary,
+  },
+  focusButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    marginHorizontal: theme.spacing.sm,
+  },
+  focusButtonText: {
+    color: Colors.white,
+    fontFamily: FONTS.SemiBold,
+    fontSize: theme.font.sm,
   },
 });
 

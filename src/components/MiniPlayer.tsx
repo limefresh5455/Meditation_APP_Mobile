@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  Dimensions,
   ActivityIndicator,
 } from 'react-native';
 import TrackPlayer, {
@@ -19,6 +18,7 @@ import { Colors } from '../constants/Colors';
 import { FONTS } from '../constants/Fonts';
 import { theme, wp } from '../utils/responsive';
 import * as NavigationUtils from '../utils/NavigationUtils';
+import { resolveSessionTrack } from '../constants/musicData';
 
 const musicPlaceHolder = require('../assets/Images/musicPlaceHolderTransparent.png');
 
@@ -62,7 +62,9 @@ const MiniPlayer: FC<MiniPlayerProps> = ({ bottomOffset }) => {
   };
 
   const handlePress = () => {
-    NavigationUtils.navigate('PlayerScreen', { track: activeTrack });
+    NavigationUtils.navigate('PlayerScreen', {
+      track: resolveSessionTrack(activeTrack as any),
+    });
   };
 
   return (

@@ -18,7 +18,7 @@ import TrackPlayer, {
   usePlaybackState,
   State,
 } from 'react-native-track-player';
-import musicData from '../../constants/musicData.json';
+import musicData from '../../constants/musicData';
 import { useAppSelector } from '../../redux/reduxHook';
 import { selectSavedTrackIds } from '../../redux/reducers/musicSlice';
 import { verifyLocalFile } from '../../services/DownloadService';
@@ -44,6 +44,15 @@ const SavedSessionsScreen: FC<SavedSessionsScreenProps> = ({ navigation }) => {
     savedTrackIds.includes(track.id),
   );
 
+  const isSessionActive = (session: any) => {
+    if (!activeTrack) return false;
+    if (activeTrack.id === session.id) return true;
+    if (session.isComposite && session.blocks) {
+      return session.blocks.some((block: any) => block.id === activeTrack.id);
+    }
+    return false;
+  };
+
   const filteredTracks = savedTracks.filter(
     track =>
       track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -53,14 +62,11 @@ const SavedSessionsScreen: FC<SavedSessionsScreenProps> = ({ navigation }) => {
   const handleTrackSelect = async (item: any) => {
     const shouldNavigate = !activeTrack;
 
-    if (activeTrack?.id === item.id) {
+    if (isSessionActive(item)) {
       if (isPlaying) {
         await TrackPlayer.pause();
       } else {
         await TrackPlayer.play();
-      }
-      if (shouldNavigate) {
-        navigation.navigate('PlayerScreen', { track: item });
       }
       return;
     }
@@ -68,17 +74,33 @@ const SavedSessionsScreen: FC<SavedSessionsScreenProps> = ({ navigation }) => {
     try {
       await TrackPlayer.reset();
 
-      const verifiedPath = await verifyLocalFile(item.id);
-      const playbackUrl = verifiedPath || item.url;
-      console.log('Saved: Setting up track with URL:', playbackUrl);
+      if (item.isComposite && item.blocks) {
+        const trackList = await Promise.all(
+          item.blocks.map(async (block: any) => {
+            const verifiedPath = await verifyLocalFile(block.id);
+            return {
+              id: block.id,
+              url: verifiedPath || block.url,
+              title: block.title,
+              artist: block.artist,
+              artwork: block.artwork || musicPlaceHolder,
+            };
+          }),
+        );
+        await TrackPlayer.add(trackList);
+      } else {
+        const verifiedPath = await verifyLocalFile(item.id);
+        const playbackUrl = verifiedPath || item.url;
+        console.log('Saved: Setting up track with URL:', playbackUrl);
 
-      await TrackPlayer.add({
-        id: item.id,
-        url: playbackUrl,
-        title: item.title,
-        artist: item.artist,
-        artwork: item.artwork || musicPlaceHolder,
-      });
+        await TrackPlayer.add({
+          id: item.id,
+          url: playbackUrl,
+          title: item.title,
+          artist: item.artist,
+          artwork: item.artwork || musicPlaceHolder,
+        });
+      }
 
       await TrackPlayer.play();
       if (shouldNavigate) {
@@ -172,9 +194,9 @@ const SavedSessionsScreen: FC<SavedSessionsScreenProps> = ({ navigation }) => {
                   duration={`${Math.floor(track.duration / 60)} min`}
                   fileSize="Dynamic MB"
                   onPlayPress={() => handleTrackSelect(track)}
-                  isPlaying={isPlaying && activeTrack?.id === track.id}
-                  isActive={activeTrack?.id === track.id}
-                  isLoading={isBuffering && activeTrack?.id === track.id}
+                  isPlaying={isPlaying && isSessionActive(track)}
+                  isActive={isSessionActive(track)}
+                  isLoading={isBuffering && isSessionActive(track)}
                 />
               ))}
             </View>

@@ -40,9 +40,10 @@ import {
   deleteTrackFile,
   verifyLocalFile,
 } from '../../services/DownloadService';
+import { resolveSessionTrack } from '../../constants/musicData';
 
 interface MusicImageProps {
-  uri: string;
+  uri?: any;
   style: any;
 }
 
@@ -54,9 +55,16 @@ interface PlayerScreenProps {
 const MusicImage: FC<MusicImageProps> = ({ uri, style }) => {
   const [hasError, setHasError] = useState(false);
 
+  const getSource = () => {
+    if (hasError || !uri) return musicPlaceHolder;
+    if (typeof uri === 'number') return uri;
+    if (typeof uri === 'string') return { uri };
+    return uri;
+  };
+
   return (
     <Image
-      source={hasError || !uri ? musicPlaceHolder : { uri }}
+      source={getSource()}
       style={style}
       onError={() => setHasError(true)}
     />
@@ -64,16 +72,23 @@ const MusicImage: FC<MusicImageProps> = ({ uri, style }) => {
 };
 
 const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
-  const { track } = route.params || {};
+  const { track: rawTrack } = route.params || {};
+  const track = rawTrack ? resolveSessionTrack(rawTrack) : null;
   const playbackState = usePlaybackState();
   const progress = useProgress();
   const activeTrack = useActiveTrack();
   const dispatch = useAppDispatch();
 
   const [panValue, setPanValue] = useState(0);
+  const [isPanningVisible, setIsPanningVisible] = useState(false);
   const soundRef = useRef<Sound | null>(null);
+  const soundUrlRef = useRef<string | null>(null);
 
-  const isCurrentTrackActive = activeTrack?.id === track?.id;
+  const isCurrentTrackActive = !!(
+    activeTrack?.id === track?.id ||
+    (track?.isComposite &&
+      track?.blocks?.some((b: any) => b.id === activeTrack?.id))
+  );
   const isPlaying =
     isCurrentTrackActive && playbackState.state === State.Playing;
 
@@ -87,15 +102,16 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
   useEffect(() => {
     const updateRepeatMode = async () => {
       await TrackPlayer.setRepeatMode(
-        isRepeatOne ? RepeatMode.Track : RepeatMode.Off,
+        isRepeatOne ? RepeatMode.Queue : RepeatMode.Off,
       );
     };
     updateRepeatMode();
   }, [isRepeatOne]);
 
   useEffect(() => {
+    Sound.setCategory('Playback', true);
     let isMounted = true;
-    if (track && activeTrack !== undefined && track.id !== activeTrack?.id) {
+    if (track && activeTrack !== undefined && !isCurrentTrackActive) {
       const setup = async () => {
         try {
           const verifiedPath = await verifyLocalFile(track.id);
@@ -116,9 +132,22 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
             soundRef.current = null;
           }
 
-          const sound = new Sound(playbackUrl, '', error => {
+          if (!playbackUrl) {
+            console.log('Player: No playback URL available');
+            return;
+          }
+
+          if (!playbackUrl) {
+            console.log('Player: No playback URL available');
+            return;
+          }
+
+          const finalUrl =
+            typeof playbackUrl === 'number' ? playbackUrl : String(playbackUrl);
+
+          const callback = (error: any) => {
             if (!isMounted) {
-              sound.release();
+              sound?.release();
               return;
             }
             if (error) {
@@ -126,6 +155,7 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
               return;
             }
             soundRef.current = sound;
+            soundUrlRef.current = String(finalUrl);
             sound.setPan(panValue);
             TrackPlayer.setVolume(0);
             sound.setVolume(1);
@@ -134,7 +164,12 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
               sound.play();
               sound.setCurrentTime(progress.position);
             }
-          });
+          };
+
+          const sound: Sound =
+            typeof finalUrl === 'number'
+              ? new Sound(finalUrl, callback)
+              : new Sound(finalUrl, '', callback);
 
           await TrackPlayer.play();
           dispatch(setLastPlayedTrack(track));
@@ -145,15 +180,33 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
       setup();
     } else if (track && isCurrentTrackActive) {
       dispatch(setLastPlayedTrack(track));
-      if (!soundRef.current && track.url) {
-        const playbackUrl = track.url;
-        const sound = new Sound(playbackUrl, '', error => {
+      if (
+        activeTrack &&
+        (!soundRef.current || soundUrlRef.current !== activeTrack.url)
+      ) {
+        if (soundRef.current) {
+          soundRef.current.release();
+        }
+        const playbackUrl = activeTrack.url;
+        if (!playbackUrl) {
+          console.log('Player: activeTrack has no URL');
+          return;
+        }
+
+        const finalUrl =
+          typeof playbackUrl === 'number' ? playbackUrl : String(playbackUrl);
+
+        const callback = (error: any) => {
           if (!isMounted) {
-            sound.release();
+            sound?.release();
             return;
           }
-          if (error) return;
+          if (error) {
+            console.log('failed to load panning sound', error);
+            return;
+          }
           soundRef.current = sound;
+          soundUrlRef.current = String(finalUrl);
           sound.setPan(panValue);
           TrackPlayer.setVolume(0);
           sound.setVolume(1);
@@ -161,7 +214,12 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
             sound.play();
             sound.setCurrentTime(progress.position);
           }
-        });
+        };
+
+        const sound: Sound =
+          typeof finalUrl === 'number'
+            ? new Sound(finalUrl, callback)
+            : new Sound(finalUrl, '', callback);
       }
     }
 
@@ -185,16 +243,32 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
         await TrackPlayer.play();
       }
     } else {
-      const verifiedPath = await verifyLocalFile(track.id);
-      const playbackUrl = verifiedPath || track.url;
       await TrackPlayer.reset();
-      await TrackPlayer.add({
-        id: track.id,
-        url: playbackUrl,
-        title: track.title,
-        artist: track.artist,
-        artwork: track.artwork || musicPlaceHolder,
-      });
+      if (track.isComposite && track.blocks) {
+        const trackList = await Promise.all(
+          track.blocks.map(async (block: any) => {
+            const verifiedPath = await verifyLocalFile(block.id);
+            return {
+              id: block.id,
+              url: verifiedPath || block.url,
+              title: block.title,
+              artist: block.artist,
+              artwork: block.artwork || musicPlaceHolder,
+            };
+          }),
+        );
+        await TrackPlayer.add(trackList);
+      } else {
+        const verifiedPath = await verifyLocalFile(track.id);
+        const playbackUrl = verifiedPath || track.url;
+        await TrackPlayer.add({
+          id: track.id,
+          url: playbackUrl,
+          title: track.title,
+          artist: track.artist,
+          artwork: track.artwork || musicPlaceHolder,
+        });
+      }
       await TrackPlayer.play();
     }
   };
@@ -204,11 +278,25 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
 
     if (isOffline) {
       dispatch(toggleOfflineTrack(track.id));
-      await deleteTrackFile(track.id);
+      if (track.isComposite && track.blocks) {
+        await Promise.all(track.blocks.map(block => deleteTrackFile(block.id)));
+      } else {
+        await deleteTrackFile(track.id);
+      }
     } else {
       dispatch(toggleOfflineTrack(track.id));
-      const path = await downloadTrack(track.id, track.url);
-      if (!path) {
+      let success = true;
+      if (track.isComposite && track.blocks) {
+        const results = await Promise.all(
+          track.blocks.map(block => downloadTrack(block.id, block.url)),
+        );
+        success = results.every(path => path !== null);
+      } else {
+        const path = await downloadTrack(track.id, track.url);
+        success = !!path;
+      }
+
+      if (!success) {
         dispatch(toggleOfflineTrack(track.id));
       }
     }
@@ -258,16 +346,106 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
     }
   };
 
+  const [currentIndex, setCurrentIndex] = useState<number | undefined>(
+    undefined,
+  );
+
+  useEffect(() => {
+    const updateIndex = async () => {
+      const index = await TrackPlayer.getActiveTrackIndex();
+      setCurrentIndex(index);
+    };
+    updateIndex();
+  }, [activeTrack?.id]);
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const currentPosition = isCurrentTrackActive ? progress.position : 0;
+  const getCumulativeSessionData = () => {
+    if (!track?.isComposite || !track.blocks) {
+      return {
+        position: progress.position,
+        duration: progress.duration || track?.duration || 0,
+      };
+    }
+
+    let cumulativePosition = progress.position;
+    const totalDuration = track.blocks.reduce(
+      (acc: number, b: any) => acc + b.duration,
+      0,
+    );
+
+    if (currentIndex !== undefined) {
+      for (let i = 0; i < currentIndex; i++) {
+        cumulativePosition += track.blocks[i].duration;
+      }
+    }
+
+    return {
+      position: cumulativePosition,
+      duration: totalDuration,
+    };
+  };
+
+  const sessionData = getCumulativeSessionData();
+  const currentPosition = isCurrentTrackActive ? sessionData.position : 0;
   const currentDuration = isCurrentTrackActive
-    ? progress.duration
+    ? sessionData.duration
     : track?.duration || 0;
+
+  const handleFocusPress = async () => {
+    if (track?.isComposite && isCurrentTrackActive) {
+      await TrackPlayer.skipToNext();
+    }
+  };
+
+  const seekByDelta = async (delta: number) => {
+    if (!isCurrentTrackActive || currentDuration <= 0) return;
+
+    const targetSessionTime = Math.max(
+      0,
+      Math.min(currentDuration, currentPosition + delta),
+    );
+
+    if (!track?.isComposite || !track.blocks) {
+      await TrackPlayer.seekTo(targetSessionTime);
+      if (soundRef.current) {
+        soundRef.current.setCurrentTime(targetSessionTime);
+      }
+      return;
+    }
+
+    let accumulatedTime = 0;
+    let targetBlockIndex = 0;
+    let targetBlockTime = 0;
+
+    for (let i = 0; i < track.blocks.length; i++) {
+      const blockDuration = track.blocks[i].duration;
+      if (targetSessionTime < accumulatedTime + blockDuration) {
+        targetBlockIndex = i;
+        targetBlockTime = targetSessionTime - accumulatedTime;
+        break;
+      }
+      accumulatedTime += blockDuration;
+      if (i === track.blocks.length - 1) {
+        targetBlockIndex = i;
+        targetBlockTime = blockDuration;
+      }
+    }
+
+    if (targetBlockIndex === currentIndex) {
+      await TrackPlayer.seekTo(targetBlockTime);
+      if (soundRef.current) {
+        soundRef.current.setCurrentTime(targetBlockTime);
+      }
+    } else {
+      await TrackPlayer.skip(targetBlockIndex);
+      await TrackPlayer.seekTo(targetBlockTime);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -281,8 +459,18 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
             {track?.title || 'Unknown Track'}
           </Text>
         </View>
-        <TouchableOpacity style={styles.headerButton}>
-          <Text style={styles.headerIcon}>⋯</Text>
+        <TouchableOpacity
+          style={styles.headerButton}
+          onPress={() => setIsPanningVisible(!isPanningVisible)}
+        >
+          <Text
+            style={[
+              styles.headerIcon,
+              isPanningVisible && { color: Colors.primary },
+            ]}
+          >
+            ⋯
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -312,9 +500,12 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
           </View>
 
           <Text style={styles.timer}>{formatTime(currentPosition)}</Text>
-          <Text style={styles.breathingText}>
-            {isPlaying ? 'Breathe with the sound...' : 'Paused'}
-          </Text>
+
+          <View style={styles.statusRow}>
+            <Text style={styles.breathingText}>
+              {isPlaying ? 'Breathe with the sound...' : 'Paused'}
+            </Text>
+          </View>
 
           <View style={styles.progressContainer}>
             <Slider
@@ -324,10 +515,38 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
               onSeek={() => {}}
               onSlidingComplete={async value => {
                 if (isCurrentTrackActive && currentDuration > 0) {
-                  const targetTime = value * currentDuration;
-                  await TrackPlayer.seekTo(targetTime);
-                  if (soundRef.current) {
-                    soundRef.current.setCurrentTime(targetTime);
+                  const targetSessionTime = value * currentDuration;
+
+                  if (!track?.isComposite || !track.blocks) {
+                    await TrackPlayer.seekTo(targetSessionTime);
+                    if (soundRef.current) {
+                      soundRef.current.setCurrentTime(targetSessionTime);
+                    }
+                    return;
+                  }
+
+                  let accumulatedTime = 0;
+                  let targetBlockIndex = 0;
+                  let targetBlockTime = 0;
+
+                  for (let i = 0; i < track.blocks.length; i++) {
+                    const blockDuration = track.blocks[i].duration;
+                    if (targetSessionTime < accumulatedTime + blockDuration) {
+                      targetBlockIndex = i;
+                      targetBlockTime = targetSessionTime - accumulatedTime;
+                      break;
+                    }
+                    accumulatedTime += blockDuration;
+                  }
+
+                  if (targetBlockIndex === currentIndex) {
+                    await TrackPlayer.seekTo(targetBlockTime);
+                    if (soundRef.current) {
+                      soundRef.current.setCurrentTime(targetBlockTime);
+                    }
+                  } else {
+                    await TrackPlayer.skip(targetBlockIndex);
+                    await TrackPlayer.seekTo(targetBlockTime);
                   }
                 }
               }}
@@ -343,30 +562,15 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
             </View>
           </View>
 
-          <View style={styles.panningContainer}>
-            <View style={styles.panningLabels}>
-              <Text style={styles.panningLabel}>LEFT</Text>
-              <Text style={styles.panningTitle}>AUDIO BALANCE</Text>
-              <Text style={styles.panningLabel}>RIGHT</Text>
-            </View>
-            <Slider
-              progress={(panValue + 1) / 2}
-              onSeek={value => handlePanChange(value * 2 - 1)}
-              height={6}
-              backgroundColor={Colors.storageBackground}
-              thumbColor={Colors.primary}
-            />
-          </View>
+          {/* Panning removed from here */}
 
           <PlayerControls
             isPlaying={isPlaying}
             onPlayPause={handlePlayPause}
-            onSkipBackward={() =>
-              isCurrentTrackActive && TrackPlayer.seekTo(progress.position - 15)
-            }
-            onSkipForward={() =>
-              isCurrentTrackActive && TrackPlayer.seekTo(progress.position + 15)
-            }
+            onSkipBackward={() => seekByDelta(-15)}
+            onSkipForward={() => seekByDelta(15)}
+            onFocus={handleFocusPress}
+            isFocusVisible={!!(track?.isComposite && isCurrentTrackActive)}
             onLoop={() => dispatch(toggleRepeatMode())}
             onSave={() => track && dispatch(toggleSaveTrack(track.id))}
             onOffline={handleOfflineToggle}
@@ -376,6 +580,29 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
           />
         </View>
       </ScrollView>
+
+      {isPanningVisible && (
+        <View style={styles.verticalPanningOverlay}>
+          <TouchableOpacity
+            style={styles.overlayCloseArea}
+            onPress={() => setIsPanningVisible(false)}
+          />
+          <View style={styles.verticalPanningCard}>
+            <Text style={styles.verticalPanningLabel}>R</Text>
+            <View style={styles.verticalSliderContainer}>
+              <Slider
+                progress={(panValue + 1) / 2}
+                onSeek={value => handlePanChange(value * 2 - 1)}
+                height={4}
+                orientation="vertical"
+                backgroundColor={Colors.storageBackground}
+                thumbColor={Colors.primary}
+              />
+            </View>
+            <Text style={styles.verticalPanningLabel}>L</Text>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -517,6 +744,108 @@ const styles = StyleSheet.create({
     fontSize: theme.font.xs,
     color: Colors.textSecondary,
     letterSpacing: 0.5,
+  },
+  verticalPanningOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+    zIndex: 100,
+  },
+  overlayCloseArea: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  verticalPanningCard: {
+    position: 'absolute',
+    right: theme.spacing.sm,
+    top: hp(15),
+    backgroundColor: 'rgba(30, 30, 45, 0.95)',
+    borderRadius: theme.radius.xl,
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: 4,
+    width: 32,
+    height: hp(40),
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  verticalSliderContainer: {
+    flex: 1,
+    paddingVertical: theme.spacing.md,
+  },
+  verticalPanningLabel: {
+    color: Colors.textTertiary,
+    fontFamily: FONTS.Bold,
+    fontSize: theme.font.xs,
+  },
+  modeControls: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: theme.spacing.md,
+    marginTop: theme.spacing.xl,
+    marginBottom: theme.spacing.sm,
+  },
+  modeButton: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  activeModeButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: Colors.white,
+  },
+  modeButtonText: {
+    color: Colors.white,
+    fontFamily: FONTS.SemiBold,
+    fontSize: theme.font.sm,
+  },
+  focusFloatingButton: {
+    position: 'absolute',
+    top: theme.spacing.md,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  focusFloatingText: {
+    color: Colors.white,
+    fontFamily: FONTS.SemiBold,
+    fontSize: theme.font.xs,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: theme.spacing.sm,
+    width: '100%',
+    position: 'relative',
+  },
+  focusInlineButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    position: 'absolute',
+    right: 0,
+  },
+  focusInlineText: {
+    color: Colors.white,
+    fontFamily: FONTS.SemiBold,
+    fontSize: theme.font.sm,
   },
 });
 

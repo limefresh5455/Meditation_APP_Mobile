@@ -16,6 +16,7 @@ interface SliderProps {
   backgroundColor?: string;
   progressColor?: string;
   thumbColor?: string;
+  orientation?: 'horizontal' | 'vertical';
 }
 
 const Slider: FC<SliderProps> = ({
@@ -27,8 +28,11 @@ const Slider: FC<SliderProps> = ({
   backgroundColor = Colors.storageBackground,
   progressColor = Colors.primary,
   thumbColor = Colors.primary,
+  orientation = 'horizontal',
 }) => {
-  const [width, setWidth] = useState(0);
+  const [size, setSize] = useState(0);
+
+  const isVertical = orientation === 'vertical';
 
   const panResponder = useMemo(
     () =>
@@ -39,44 +43,68 @@ const Slider: FC<SliderProps> = ({
           onSlidingStart?.();
         },
         onPanResponderMove: (evt, gestureState) => {
-          if (width > 0) {
-            const newProgress = Math.min(
-              Math.max(evt.nativeEvent.locationX / width, 0),
-              1,
-            );
+          if (size > 0) {
+            let newProgress;
+            if (isVertical) {
+              // In vertical, 0 is bottom, 1 is top
+              newProgress = Math.min(
+                Math.max(1 - evt.nativeEvent.locationY / size, 0),
+                1,
+              );
+            } else {
+              newProgress = Math.min(
+                Math.max(evt.nativeEvent.locationX / size, 0),
+                1,
+              );
+            }
             onSeek(newProgress);
           }
         },
         onPanResponderRelease: (evt, gestureState) => {
-          if (width > 0) {
-            const newProgress = Math.min(
-              Math.max(evt.nativeEvent.locationX / width, 0),
-              1,
-            );
+          if (size > 0) {
+            let newProgress;
+            if (isVertical) {
+              newProgress = Math.min(
+                Math.max(1 - evt.nativeEvent.locationY / size, 0),
+                1,
+              );
+            } else {
+              newProgress = Math.min(
+                Math.max(evt.nativeEvent.locationX / size, 0),
+                1,
+              );
+            }
             onSlidingComplete?.(newProgress);
           }
         },
       }),
-    [width, onSeek, onSlidingStart, onSlidingComplete],
+    [size, onSeek, onSlidingStart, onSlidingComplete, isVertical],
   );
 
   const onLayout = (event: LayoutChangeEvent) => {
-    setWidth(event.nativeEvent.layout.width);
+    setSize(
+      isVertical
+        ? event.nativeEvent.layout.height
+        : event.nativeEvent.layout.width,
+    );
   };
 
   const clampedProgress = Math.min(Math.max(progress, 0), 1);
 
   return (
     <View
-      style={styles.container}
+      style={[
+        styles.container,
+        isVertical ? styles.verticalContainer : styles.horizontalContainer,
+      ]}
       onLayout={onLayout}
       {...panResponder.panHandlers}
     >
       <View
         style={[
-          styles.track,
+          isVertical ? styles.verticalTrack : styles.track,
           {
-            height,
+            [isVertical ? 'width' : 'height']: height,
             backgroundColor,
             borderRadius: height / 2,
           },
@@ -84,9 +112,9 @@ const Slider: FC<SliderProps> = ({
       >
         <View
           style={[
-            styles.progress,
+            isVertical ? styles.verticalProgress : styles.progress,
             {
-              width: `${clampedProgress * 100}%`,
+              [isVertical ? 'height' : 'width']: `${clampedProgress * 100}%`,
               backgroundColor: progressColor,
               borderRadius: height / 2,
             },
@@ -95,14 +123,15 @@ const Slider: FC<SliderProps> = ({
         <View
           style={[
             styles.thumb,
+            isVertical ? styles.verticalThumb : styles.horizontalThumb,
             {
-              left: `${clampedProgress * 100}%`,
+              [isVertical ? 'bottom' : 'left']: `${clampedProgress * 100}%`,
               backgroundColor: thumbColor,
-              width: height * 3,
-              height: height * 3,
-              borderRadius: (height * 3) / 2,
-              marginLeft: -(height * 1.5),
-              marginTop: -(height * 3) / 2,
+              width: height * 4,
+              height: height * 4,
+              borderRadius: height * 2,
+              [isVertical ? 'marginLeft' : 'marginTop']: -(height * 2),
+              [isVertical ? 'marginBottom' : 'marginLeft']: -(height * 2),
             },
           ]}
         />
@@ -113,25 +142,45 @@ const Slider: FC<SliderProps> = ({
 
 const styles = StyleSheet.create({
   container: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  horizontalContainer: {
     width: '100%',
     height: 40,
-    justifyContent: 'center',
+  },
+  verticalContainer: {
+    height: '100%',
+    width: 32,
   },
   track: {
     width: '100%',
     position: 'relative',
   },
+  verticalTrack: {
+    height: '100%',
+    position: 'relative',
+    justifyContent: 'flex-end',
+  },
   progress: {
     height: '100%',
   },
+  verticalProgress: {
+    width: '100%',
+  },
   thumb: {
     position: 'absolute',
-    top: '50%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  horizontalThumb: {
+    top: '50%',
+  },
+  verticalThumb: {
+    left: '50%',
   },
 });
 

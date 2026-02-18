@@ -12,7 +12,7 @@ import React, { FC } from 'react';
 import { Colors } from '../../constants/Colors';
 import { FONTS } from '../../constants/Fonts';
 import { theme, wp } from '../../utils/responsive';
-import musicData from '../../constants/musicData.json';
+import musicData from '../../constants/musicData';
 import TrackPlayer, {
   useActiveTrack,
   usePlaybackState,
@@ -71,17 +71,33 @@ const ExploreScreen: FC<ExploreScreenProps> = ({ navigation }) => {
     try {
       await TrackPlayer.reset();
 
-      const verifiedPath = await verifyLocalFile(item.id);
-      const playbackUrl = verifiedPath || item.url;
-      console.log('Explore: Setting up track with URL:', playbackUrl);
+      if (item.isComposite && item.blocks) {
+        const trackList = await Promise.all(
+          item.blocks.map(async (block: any) => {
+            const verifiedPath = await verifyLocalFile(block.id);
+            return {
+              id: block.id,
+              url: verifiedPath || block.url,
+              title: block.title,
+              artist: block.artist,
+              artwork: block.artwork || musicPlaceHolder,
+            };
+          }),
+        );
+        await TrackPlayer.add(trackList);
+      } else {
+        const verifiedPath = await verifyLocalFile(item.id);
+        const playbackUrl = verifiedPath || item.url;
+        console.log('Explore: Setting up track with URL:', playbackUrl);
 
-      await TrackPlayer.add({
-        id: item.id,
-        url: playbackUrl,
-        title: item.title,
-        artist: item.artist,
-        artwork: item.artwork || musicPlaceHolder,
-      });
+        await TrackPlayer.add({
+          id: item.id,
+          url: playbackUrl,
+          title: item.title,
+          artist: item.artist,
+          artwork: item.artwork || musicPlaceHolder,
+        });
+      }
 
       await TrackPlayer.play();
       if (shouldNavigate) {
