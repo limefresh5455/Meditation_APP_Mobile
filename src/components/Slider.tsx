@@ -3,6 +3,7 @@ import { View, StyleSheet, ImageSourcePropType } from 'react-native';
 import RNSlider from '@react-native-community/slider';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Colors } from '../constants/Colors';
+import { isTablet } from '../utils/responsive';
 
 interface SliderProps {
   progress: number;
@@ -14,6 +15,7 @@ interface SliderProps {
   progressColor?: string;
   thumbColor?: string;
   orientation?: 'horizontal' | 'vertical';
+  sliderLength?: number;
 }
 
 const Slider: FC<SliderProps> = ({
@@ -25,6 +27,7 @@ const Slider: FC<SliderProps> = ({
   progressColor = Colors.primary,
   thumbColor = Colors.primary,
   orientation = 'horizontal',
+  sliderLength = 200,
 }) => {
   const [slideValue, setSlideValue] = useState(progress);
   const [isSliding, setIsSliding] = useState(false);
@@ -76,10 +79,10 @@ const Slider: FC<SliderProps> = ({
 
   if (isVertical) {
     return (
-      <View style={styles.verticalContainer}>
-        <View style={styles.verticalInner}>
+      <View style={[styles.verticalContainer, { height: sliderLength }]}>
+        <View style={[styles.verticalInner, { width: sliderLength }]}>
           <RNSlider
-            style={styles.verticalSlider}
+            style={[styles.verticalSlider, { width: sliderLength }]}
             value={slideValue}
             minimumValue={0}
             maximumValue={1}
@@ -122,18 +125,18 @@ const styles = StyleSheet.create({
   },
   verticalContainer: {
     flex: 1,
-    width: 32,
+    width: isTablet() ? 60 : 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
   verticalInner: {
-    width: 200,
-    height: 32,
+    width: isTablet() ? 320 : 200,
+    height: isTablet() ? 60 : 32,
     transform: [{ rotate: '-90deg' }],
   },
   verticalSlider: {
     width: '100%',
-    height: 32,
+    height: '100%',
   },
 });
 

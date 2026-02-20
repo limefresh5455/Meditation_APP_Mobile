@@ -11,7 +11,7 @@ import React, { FC, useState } from 'react';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../../constants/Colors';
 import { FONTS } from '../../constants/Fonts';
-import { theme, wp } from '../../utils/responsive';
+import { isTablet, theme, wp } from '../../utils/responsive';
 import SessionListItem from '../../components/SessionListItem';
 import TrackPlayer, {
   useActiveTrack,
@@ -134,7 +134,7 @@ const SavedSessionsScreen: FC<SavedSessionsScreenProps> = ({ navigation }) => {
         <View style={styles.searchContainer}>
           <Icon
             name="search"
-            size={20}
+            size={isTablet() ? 26 : 20}
             color={Colors.textTertiary}
             style={styles.searchIcon}
           />
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: theme.spacing.xxl * 2,
+    marginTop: isTablet() ? theme.spacing.sm * 1.5 : theme.spacing.xxl * 2,
     paddingHorizontal: theme.spacing.xl,
   },
   emptyIcon: {
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
     fontSize: theme.font.md,
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: isTablet() ? 45 : 22,
   },
 });
 

@@ -728,23 +728,23 @@ const styles = StyleSheet.create({
   },
   verticalPanningCard: {
     position: 'absolute',
-    right: theme.spacing.sm,
+    right: theme.spacing.md,
     top: hp(15),
     backgroundColor: 'rgba(30, 30, 45, 0.95)',
     borderRadius: theme.radius.xl,
-    paddingVertical: theme.spacing.lg,
-    paddingHorizontal: 4,
-    width: 32,
-    height: hp(40),
+
+    width: isTablet() ? 70 : 28,
+    height: isTablet() ? hp(38) : hp(40),
+
+    paddingVertical: isTablet() ? theme.spacing.xl : theme.spacing.lg,
     alignItems: 'center',
     justifyContent: 'space-between',
+
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
     elevation: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   verticalSliderContainer: {
     flex: 1,
