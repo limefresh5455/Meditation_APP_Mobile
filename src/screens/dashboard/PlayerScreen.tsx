@@ -7,7 +7,6 @@ import {
   ScrollView,
 } from 'react-native';
 import React, { FC, useEffect, useState, useRef } from 'react';
-import Sound from 'react-native-sound';
 import { Colors } from '../../constants/Colors';
 import { FONTS } from '../../constants/Fonts';
 import { wp, hp, isLandscape, isTablet, theme } from '../../utils/responsive';
@@ -21,14 +20,15 @@ import TrackPlayer, {
 } from 'react-native-track-player';
 import Toast from 'react-native-simple-toast';
 import {
-  setLastPlayedTrack,
-  updatePlaybackPosition,
+  updateCurrentPosition,
   selectSavedTrackIds,
   selectOfflineTrackIds,
   selectIsRepeatOne,
   toggleSaveTrack,
   toggleOfflineTrack,
   toggleRepeatMode,
+  selectPanValue,
+  setPanValue,
 } from '../../redux/reducers/musicSlice';
 
 import musicPlaceHolder from '../../assets/Images/musicPlaceHolderTransparent.png';
@@ -41,6 +41,7 @@ import {
 } from '../../services/DownloadService';
 import { resolveSessionTrack } from '../../constants/musicData';
 import MusicImage from '../../components/MusicImage';
+import PanningService from '../../services/PanningService';
 
 interface PlayerScreenProps {
   navigation: any;
@@ -55,10 +56,8 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
   const activeTrack = useActiveTrack();
   const dispatch = useAppDispatch();
 
-  const [panValue, setPanValue] = useState(0);
+  const panValue = useAppSelector(selectPanValue);
   const [isPanningVisible, setIsPanningVisible] = useState(false);
-  const soundRef = useRef<Sound | null>(null);
-  const soundUrlRef = useRef<string | null>(null);
 
   const isCurrentTrackActive = !!(
     activeTrack?.id === track?.id ||
@@ -87,18 +86,8 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
   const setupIdRef = useRef(0);
 
   useEffect(() => {
-    Sound.setCategory('Playback', true);
     let isMounted = true;
     const currentSetupId = ++setupIdRef.current;
-
-    const cleanupSound = () => {
-      if (soundRef.current) {
-        soundRef.current.stop();
-        soundRef.current.release();
-        soundRef.current = null;
-        soundUrlRef.current = null;
-      }
-    };
 
     if (track && activeTrack !== undefined && !isCurrentTrackActive) {
       const setup = async () => {
@@ -120,94 +109,18 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
             artwork: track.artwork || musicPlaceHolder,
           });
 
-          cleanupSound();
-
-          if (!playbackUrl || currentSetupId !== setupIdRef.current) return;
-
-          const finalUrl =
-            typeof playbackUrl === 'number' ? playbackUrl : String(playbackUrl);
-
-          const callback = (error: any) => {
-            if (!isMounted || currentSetupId !== setupIdRef.current) {
-              sound?.release();
-              return;
-            }
-            if (error) {
-              console.log('failed to load panning sound', error);
-              return;
-            }
-            soundRef.current = sound;
-            soundUrlRef.current = String(finalUrl);
-            sound.setPan(panValue);
-            TrackPlayer.setVolume(0);
-            sound.setVolume(1);
-
-            if (isPlaying) {
-              sound.play();
-              sound.setCurrentTime(progress.position);
-            }
-          };
-
-          const sound: Sound =
-            typeof finalUrl === 'number'
-              ? new Sound(finalUrl, callback)
-              : new Sound(finalUrl, '', callback);
-
           await TrackPlayer.play();
         } catch (err) {
           console.log('Error in PlayerScreen setup:', err);
         }
       };
       setup();
-    } else if (track && isCurrentTrackActive) {
-      if (
-        activeTrack &&
-        (!soundRef.current || soundUrlRef.current !== activeTrack.url)
-      ) {
-        cleanupSound();
-        const playbackUrl = activeTrack.url;
-        if (!playbackUrl) return;
-
-        const finalUrl =
-          typeof playbackUrl === 'number' ? playbackUrl : String(playbackUrl);
-
-        const callback = (error: any) => {
-          if (!isMounted || currentSetupId !== setupIdRef.current) {
-            sound?.release();
-            return;
-          }
-          if (error) {
-            console.log('failed to load panning sound', error);
-            return;
-          }
-          soundRef.current = sound;
-          soundUrlRef.current = String(finalUrl);
-          sound.setPan(panValue);
-          TrackPlayer.setVolume(0);
-          sound.setVolume(1);
-          if (isPlaying) {
-            sound.play();
-            sound.setCurrentTime(progress.position);
-          }
-        };
-
-        const sound: Sound =
-          typeof finalUrl === 'number'
-            ? new Sound(finalUrl, callback)
-            : new Sound(finalUrl, '', callback);
-      }
     }
 
     return () => {
       isMounted = false;
     };
   }, [track?.id, activeTrack?.id, isCurrentTrackActive]);
-
-  useEffect(() => {
-    if (isCurrentTrackActive && progress.position > 0) {
-      dispatch(updatePlaybackPosition(progress.position));
-    }
-  }, [progress.position, isCurrentTrackActive]);
 
   const handlePlayPause = async () => {
     if (!track) return;
@@ -220,9 +133,7 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
             await TrackPlayer.skip(0);
           }
           await TrackPlayer.seekTo(0);
-          if (soundRef.current) {
-            soundRef.current.setCurrentTime(0);
-          }
+          PanningService.seekTo(0);
         }
         await TrackPlayer.play();
       }
@@ -292,47 +203,12 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
   };
 
   const handleBack = () => {
-    if (soundRef.current) {
-      soundRef.current.stop().release();
-      soundRef.current = null;
-    }
-    TrackPlayer.setVolume(1);
     navigation.goBack();
   };
 
-  const syncPanning = () => {
-    if (!soundRef.current) return;
-    if (isPlaying) {
-      soundRef.current.play();
-      soundRef.current.getCurrentTime(sec => {
-        if (Math.abs(sec - progress.position) > 1.0) {
-          soundRef.current?.setCurrentTime(progress.position);
-        }
-      });
-    } else {
-      soundRef.current.pause();
-    }
-  };
-
-  useEffect(() => {
-    syncPanning();
-  }, [isPlaying, progress.position]);
-
-  useEffect(() => {
-    return () => {
-      if (soundRef.current) {
-        soundRef.current.stop().release();
-        soundRef.current = null;
-      }
-      TrackPlayer.setVolume(1);
-    };
-  }, []);
-
   const handlePanChange = (value: number) => {
-    setPanValue(value);
-    if (soundRef.current) {
-      soundRef.current.setPan(value);
-    }
+    dispatch(setPanValue(value));
+    PanningService.setPan(value);
   };
 
   const [currentIndex, setCurrentIndex] = useState<number | undefined>(
@@ -398,12 +274,9 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
       0,
       Math.min(currentDuration, currentPosition + delta),
     );
-
     if (!track?.isComposite || !track.blocks) {
       await TrackPlayer.seekTo(targetSessionTime);
-      if (soundRef.current) {
-        soundRef.current.setCurrentTime(targetSessionTime);
-      }
+      PanningService.seekTo(targetSessionTime);
       return;
     }
 
@@ -427,9 +300,7 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
 
     if (targetBlockIndex === currentIndex) {
       await TrackPlayer.seekTo(targetBlockTime);
-      if (soundRef.current) {
-        soundRef.current.setCurrentTime(targetBlockTime);
-      }
+      PanningService.seekTo(targetBlockTime);
     } else {
       await TrackPlayer.skip(targetBlockIndex);
       await TrackPlayer.seekTo(targetBlockTime);
@@ -500,9 +371,7 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
 
                   if (!track?.isComposite || !track.blocks) {
                     await TrackPlayer.seekTo(targetSessionTime);
-                    if (soundRef.current) {
-                      soundRef.current.setCurrentTime(targetSessionTime);
-                    }
+                    PanningService.seekTo(targetSessionTime);
                     return;
                   }
 
@@ -522,9 +391,7 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
 
                   if (targetBlockIndex === currentIndex) {
                     await TrackPlayer.seekTo(targetBlockTime);
-                    if (soundRef.current) {
-                      soundRef.current.setCurrentTime(targetBlockTime);
-                    }
+                    PanningService.seekTo(targetBlockTime);
                   } else {
                     await TrackPlayer.skip(targetBlockIndex);
                     await TrackPlayer.seekTo(targetBlockTime);

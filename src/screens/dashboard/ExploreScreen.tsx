@@ -21,8 +21,8 @@ import TrackPlayer, {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { verifyLocalFile } from '../../services/DownloadService';
 import {
-  setLastPlayedTrack,
-  updatePlaybackPosition,
+  setTrackHistory,
+  updateCurrentPosition,
 } from '../../redux/reducers/musicSlice';
 import { useAppDispatch } from '../../redux/reduxHook';
 
@@ -86,19 +86,7 @@ const ExploreScreen: FC<ExploreScreenProps> = ({ navigation }) => {
         navigation.navigate('PlayerScreen', { track: item });
       }
 
-      if (activeTrack) {
-        const prevTrackInfo = musicData.find(
-          (m: any) =>
-            m.id === activeTrack.id ||
-            (m.isComposite &&
-              m.blocks?.some((b: any) => b.id === activeTrack.id)),
-        );
-        if (prevTrackInfo) {
-          const { position } = await TrackPlayer.getProgress();
-          dispatch(setLastPlayedTrack(prevTrackInfo));
-          dispatch(updatePlaybackPosition(position));
-        }
-      }
+      dispatch(setTrackHistory({ track: item, isContinuing: false }));
 
       await TrackPlayer.reset();
 

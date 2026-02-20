@@ -23,8 +23,6 @@ const OnboardingScreen: FC<OnboardingScreenProps> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        {/* <Text style={styles.brandName}>SERENITY</Text> */}
-
         <View style={styles.illustrationContainer}>
           <View style={styles.circle}>
             <Image

@@ -11,7 +11,6 @@ interface MusicImageProps {
 const MusicImage: FC<MusicImageProps> = ({ uri, style }) => {
   const [hasError, setHasError] = useState(false);
 
-  // Reset error state when uri changes
   useEffect(() => {
     setHasError(false);
   }, [uri]);

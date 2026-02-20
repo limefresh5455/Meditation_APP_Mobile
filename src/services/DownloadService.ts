@@ -4,16 +4,13 @@ export const getLocalPath = (trackId: string) => {
   return `${RNFS.DocumentDirectoryPath}/${trackId}.mp3`;
 };
 
-/**
- * Returns true only for real remote HTTP/HTTPS URLs (not localhost/Metro bundler).
- */
 const isRemoteUrl = (url: string): boolean => {
   if (!url || typeof url !== 'string') return false;
   const lower = url.toLowerCase();
   if (!lower.startsWith('http://') && !lower.startsWith('https://')) {
     return false;
   }
-  // Metro dev server URLs are not real remote URLs
+
   if (
     lower.includes('localhost') ||
     lower.includes('127.0.0.1') ||
@@ -24,19 +21,9 @@ const isRemoteUrl = (url: string): boolean => {
   return true;
 };
 
-/**
- * Downloads a track to local storage.
- * - For real remote URLs: downloads via HTTP.
- * - For local/bundled assets (Metro URLs, file://, etc.): the audio is already
- *   in the app bundle and always accessible, so we return a special 'bundled'
- *   marker to signal success without needing an actual download.
- * Returns the local file path on success, 'bundled' for local assets, or null on failure.
- */
 export const downloadTrack = async (trackId: string, url: string) => {
   try {
     const localPath = getLocalPath(trackId);
-
-    // If already downloaded to disk, return existing path
     const exists = await RNFS.exists(localPath);
     if (exists) {
       console.log('Already downloaded:', trackId);
@@ -44,7 +31,6 @@ export const downloadTrack = async (trackId: string, url: string) => {
     }
 
     if (!isRemoteUrl(url)) {
-      // This is a bundled/local asset — always on device, no download needed.
       console.log('Bundled asset, marking as offline:', trackId);
       return 'bundled';
     }

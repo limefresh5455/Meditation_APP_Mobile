@@ -16,33 +16,91 @@ interface Track {
 
 interface MusicState {
   lastPlayedTrack: Track | null;
-  playbackPosition: number;
+  lastPlayedPosition: number;
+  previousTrack: Track | null;
+  previousPosition: number;
+  isContinuingCurrent: boolean;
   savedTrackIds: string[];
   offlineTrackIds: string[];
   isRepeatOne: boolean;
+  panValue: number;
 }
 
 const initialState: MusicState = {
   lastPlayedTrack: null,
-  playbackPosition: 0,
+  lastPlayedPosition: 0,
+  previousTrack: null,
+  previousPosition: 0,
+  isContinuingCurrent: false,
   savedTrackIds: [],
   offlineTrackIds: [],
   isRepeatOne: false,
+  panValue: 0,
 };
 
 export const musicSlice = createSlice({
   name: 'music',
   initialState,
   reducers: {
-    setLastPlayedTrack: (state, action: PayloadAction<Track>) => {
-      state.lastPlayedTrack = action.payload;
+    setTrackHistory: (
+      state,
+      action: PayloadAction<{ track: Track; isContinuing?: boolean }>,
+    ) => {
+      const { track: newTrack, isContinuing } = action.payload;
+
+      // If it's the same track and we are already "continuing", do nothing
+      if (state.lastPlayedTrack?.id === newTrack.id) {
+        if (isContinuing) {
+          state.isContinuingCurrent = true;
+        }
+        return;
+      }
+
+      // If we are "continuing" a session (from history card),
+      // we might be continuing the previous track
+      if (isContinuing) {
+        // Switch them back if needed
+        if (state.previousTrack?.id === newTrack.id) {
+          const tempTrack = state.lastPlayedTrack;
+          const tempPos = state.lastPlayedPosition;
+
+          state.lastPlayedTrack = state.previousTrack;
+          state.lastPlayedPosition = state.previousPosition;
+
+          state.previousTrack = tempTrack;
+          state.previousPosition = tempPos;
+        } else {
+          // If it's something else but marked as continuing (shouldn't really happen from card)
+          if (state.lastPlayedTrack) {
+            state.previousTrack = state.lastPlayedTrack;
+            state.previousPosition = state.lastPlayedPosition;
+          }
+          state.lastPlayedTrack = newTrack;
+          state.lastPlayedPosition = 0;
+        }
+        state.isContinuingCurrent = true;
+        return;
+      }
+
+      // Normal discovery flow (Library, Search, etc.)
+      if (state.lastPlayedTrack) {
+        state.previousTrack = state.lastPlayedTrack;
+        state.previousPosition = state.lastPlayedPosition;
+      }
+
+      state.lastPlayedTrack = newTrack;
+      state.lastPlayedPosition = 0;
+      state.isContinuingCurrent = false;
+      state.panValue = 0;
     },
-    updatePlaybackPosition: (state, action: PayloadAction<number>) => {
-      state.playbackPosition = action.payload;
+    updateCurrentPosition: (state, action: PayloadAction<number>) => {
+      state.lastPlayedPosition = action.payload;
     },
-    clearLastPlayedTrack: state => {
+    clearHistory: state => {
       state.lastPlayedTrack = null;
-      state.playbackPosition = 0;
+      state.lastPlayedPosition = 0;
+      state.previousTrack = null;
+      state.previousPosition = 0;
     },
     toggleSaveTrack: (state, action: PayloadAction<string>) => {
       const trackId = action.payload;
@@ -70,22 +128,32 @@ export const musicSlice = createSlice({
     toggleRepeatMode: state => {
       state.isRepeatOne = !state.isRepeatOne;
     },
+    setPanValue: (state, action: PayloadAction<number>) => {
+      state.panValue = action.payload;
+    },
   },
 });
 
 export const {
-  setLastPlayedTrack,
-  updatePlaybackPosition,
-  clearLastPlayedTrack,
+  setTrackHistory,
+  updateCurrentPosition,
+  clearHistory,
   toggleSaveTrack,
   toggleOfflineTrack,
   toggleRepeatMode,
+  setPanValue,
 } = musicSlice.actions;
 
 export const selectLastPlayedTrack = (state: RootState) =>
   state.music.lastPlayedTrack;
-export const selectPlaybackPosition = (state: RootState) =>
-  state.music.playbackPosition;
+export const selectLastPlayedPosition = (state: RootState) =>
+  state.music.lastPlayedPosition;
+export const selectPreviousTrack = (state: RootState) =>
+  state.music.previousTrack;
+export const selectPreviousPosition = (state: RootState) =>
+  state.music.previousPosition;
+export const selectIsContinuingCurrent = (state: RootState) =>
+  state.music.isContinuingCurrent;
 
 const selectMusicState = (state: RootState) => state.music;
 
@@ -102,6 +170,11 @@ export const selectOfflineTrackIds = createSelector(
 export const selectIsRepeatOne = createSelector(
   [selectMusicState],
   (music: MusicState) => music.isRepeatOne,
+);
+
+export const selectPanValue = createSelector(
+  [selectMusicState],
+  (music: MusicState) => music.panValue ?? 0,
 );
 
 export default musicSlice.reducer;

@@ -22,8 +22,8 @@ import musicData from '../../constants/musicData';
 import { useAppSelector, useAppDispatch } from '../../redux/reduxHook';
 import {
   selectSavedTrackIds,
-  setLastPlayedTrack,
-  updatePlaybackPosition,
+  setTrackHistory,
+  updateCurrentPosition,
 } from '../../redux/reducers/musicSlice';
 import { verifyLocalFile } from '../../services/DownloadService';
 
@@ -81,25 +81,11 @@ const SavedSessionsScreen: FC<SavedSessionsScreenProps> = ({ navigation }) => {
         return;
       }
 
-      // Start navigation conditionally
       if (shouldNavigate) {
         navigation.navigate('PlayerScreen', { track: item });
       }
 
-      // Save the previous track as "last played" before switching
-      if (activeTrack) {
-        const prevTrackInfo = musicData.find(
-          (m: any) =>
-            m.id === activeTrack.id ||
-            (m.isComposite &&
-              m.blocks?.some((b: any) => b.id === activeTrack.id)),
-        );
-        if (prevTrackInfo) {
-          const { position } = await TrackPlayer.getProgress();
-          dispatch(setLastPlayedTrack(prevTrackInfo));
-          dispatch(updatePlaybackPosition(position));
-        }
-      }
+      dispatch(setTrackHistory({ track: item, isContinuing: false }));
 
       await TrackPlayer.reset();
 

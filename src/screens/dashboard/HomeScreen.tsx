@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ActivityIndicator,
-  Image,
 } from 'react-native';
 import React, { FC } from 'react';
 import { Colors } from '../../constants/Colors';
@@ -25,9 +24,12 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import MusicImage from '../../components/MusicImage';
 import {
   selectLastPlayedTrack,
-  selectPlaybackPosition,
-  setLastPlayedTrack,
-  updatePlaybackPosition,
+  selectLastPlayedPosition,
+  selectPreviousTrack,
+  selectPreviousPosition,
+  selectIsContinuingCurrent,
+  setTrackHistory,
+  updateCurrentPosition,
 } from '../../redux/reducers/musicSlice';
 import { useAppSelector, useAppDispatch } from '../../redux/reduxHook';
 import { verifyLocalFile } from '../../services/DownloadService';
@@ -41,7 +43,10 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
   const playbackState = usePlaybackState();
   const { position: realTimePosition } = useProgress();
   const lastPlayedTrack = useAppSelector(selectLastPlayedTrack);
-  const playbackPosition = useAppSelector(selectPlaybackPosition);
+  const lastPlayedPosition = useAppSelector(selectLastPlayedPosition);
+  const previousTrack = useAppSelector(selectPreviousTrack);
+  const previousPosition = useAppSelector(selectPreviousPosition);
+  const isContinuingCurrent = useAppSelector(selectIsContinuingCurrent);
   const dispatch = useAppDispatch();
 
   const isPlaying = playbackState.state === State.Playing;
@@ -59,6 +64,35 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
 
   const isProcessingSelect = React.useRef(false);
 
+  const isTrackActive = (item: any): boolean => {
+    if (!activeTrack || !item) return false;
+    if (activeTrack.id === item.id) return true;
+    if (item.isComposite && item.blocks) {
+      return item.blocks.some((block: any) => block.id === activeTrack.id);
+    }
+    return false;
+  };
+
+  const isActiveTrackSame = isTrackActive(lastPlayedTrack);
+  const showCurrentInHistory = isActiveTrackSame && isContinuingCurrent;
+
+  const trackToDisplay = activeTrack
+    ? showCurrentInHistory
+      ? lastPlayedTrack
+      : previousTrack
+    : lastPlayedTrack;
+
+  const initialPosition = activeTrack
+    ? showCurrentInHistory
+      ? lastPlayedPosition
+      : previousPosition
+    : lastPlayedPosition;
+
+  const isDisplayTrackActive = isTrackActive(trackToDisplay);
+  const displayPosition = isDisplayTrackActive
+    ? realTimePosition
+    : initialPosition;
+
   const handleTrackSelect = async (
     item: any,
     resumePosition?: number,
@@ -68,7 +102,7 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
     isProcessingSelect.current = true;
 
     try {
-      const isSameTrack = activeTrack?.id === item.id;
+      const isSameTrack = isTrackActive(item);
       const shouldNavigate = !activeTrack;
 
       if (isSameTrack) {
@@ -87,20 +121,9 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
         navigation.navigate('PlayerScreen', { track: item });
       }
 
-      // Save the previous track as "last played" before switching
-      if (activeTrack && !skipSaveLastPlayed) {
-        const prevTrackInfo = musicData.find(
-          (m: any) =>
-            m.id === activeTrack.id ||
-            (m.isComposite &&
-              m.blocks?.some((b: any) => b.id === activeTrack.id)),
-        );
-        if (prevTrackInfo) {
-          const { position } = await TrackPlayer.getProgress();
-          dispatch(setLastPlayedTrack(prevTrackInfo));
-          dispatch(updatePlaybackPosition(position));
-        }
-      }
+      dispatch(
+        setTrackHistory({ track: item, isContinuing: skipSaveLastPlayed }),
+      );
 
       await TrackPlayer.reset();
 
@@ -130,11 +153,33 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
         });
       }
 
-      await TrackPlayer.play();
-
       if (resumePosition && resumePosition > 0) {
-        await TrackPlayer.seekTo(resumePosition);
+        if (item.isComposite && item.blocks) {
+          let accumulatedTime = 0;
+          let targetBlockIndex = 0;
+          let relativePosition = resumePosition;
+
+          for (let i = 0; i < item.blocks.length; i++) {
+            const blockDuration = item.blocks[i].duration || 0;
+            if (accumulatedTime + blockDuration > resumePosition) {
+              targetBlockIndex = i;
+              relativePosition = resumePosition - accumulatedTime;
+              break;
+            }
+            accumulatedTime += blockDuration;
+          }
+
+          console.log(
+            `Resuming composite track at block ${targetBlockIndex}, position ${relativePosition}`,
+          );
+          await TrackPlayer.skip(targetBlockIndex);
+          await TrackPlayer.seekTo(relativePosition);
+        } else {
+          await TrackPlayer.seekTo(resumePosition);
+        }
       }
+
+      await TrackPlayer.play();
     } catch (e) {
       console.log('Error in handleTrackSelect:', e);
     } finally {
@@ -232,29 +277,26 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
-        {lastPlayedTrack && (
+        {trackToDisplay && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Continue last session</Text>
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() =>
                 handleTrackSelect(
-                  lastPlayedTrack,
-                  activeTrack?.id === lastPlayedTrack.id
-                    ? undefined
-                    : playbackPosition,
+                  trackToDisplay,
+                  isDisplayTrackActive ? undefined : initialPosition,
                   true,
                 )
               }
               style={[
                 styles.continueSessionCard,
-                activeTrack?.id === lastPlayedTrack.id &&
-                  styles.activeContinueSession,
+                isDisplayTrackActive && styles.activeContinueSession,
               ]}
             >
               <View style={styles.continueSessionThumbnail}>
                 <MusicImage
-                  uri={lastPlayedTrack.artwork}
+                  uri={trackToDisplay.artwork}
                   style={styles.continueSessionImage}
                 />
               </View>
@@ -262,26 +304,19 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
                 <Text
                   style={[
                     styles.continueSessionTitle,
-                    activeTrack?.id === lastPlayedTrack.id &&
-                      styles.activeItemText,
+                    isDisplayTrackActive && styles.activeItemText,
                   ]}
                 >
-                  {lastPlayedTrack.title}
+                  {trackToDisplay.title}
                 </Text>
                 <Text style={styles.continueSessionSubtitle}>
-                  {lastPlayedTrack.artist} •{' '}
+                  {trackToDisplay.artist} •{' '}
                   {(() => {
-                    const isTrackActive =
-                      activeTrack?.id === lastPlayedTrack.id;
-                    const displayPosition = isTrackActive
-                      ? realTimePosition
-                      : playbackPosition;
-                    // Fallback to musicData for duration if missing
                     const fullTrackInfo = musicData.find(
-                      m => m.id === lastPlayedTrack.id,
+                      m => m.id === trackToDisplay.id,
                     );
                     const duration =
-                      lastPlayedTrack.duration || fullTrackInfo?.duration || 0;
+                      trackToDisplay.duration || fullTrackInfo?.duration || 0;
                     return duration
                       ? `${Math.max(
                           0,
@@ -296,16 +331,11 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
                       styles.progressBar,
                       {
                         width: (() => {
-                          const isTrackActive =
-                            activeTrack?.id === lastPlayedTrack.id;
-                          const displayPosition = isTrackActive
-                            ? realTimePosition
-                            : playbackPosition;
                           const fullTrackInfo = musicData.find(
-                            m => m.id === lastPlayedTrack.id,
+                            m => m.id === trackToDisplay.id,
                           );
                           const duration =
-                            lastPlayedTrack.duration ||
+                            trackToDisplay.duration ||
                             fullTrackInfo?.duration ||
                             0;
                           return duration
@@ -325,23 +355,17 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
                 activeOpacity={0.7}
                 onPress={() =>
                   handleTrackSelect(
-                    lastPlayedTrack,
-                    activeTrack?.id === lastPlayedTrack.id
-                      ? undefined
-                      : playbackPosition,
+                    trackToDisplay,
+                    isDisplayTrackActive ? undefined : initialPosition,
                     true,
                   )
                 }
               >
-                {activeTrack?.id === lastPlayedTrack.id && isBuffering ? (
+                {isDisplayTrackActive && isBuffering ? (
                   <ActivityIndicator color={Colors.white} size="small" />
                 ) : (
                   <Icon
-                    name={
-                      isPlaying && activeTrack?.id === lastPlayedTrack.id
-                        ? 'pause'
-                        : 'play'
-                    }
+                    name={isPlaying && isDisplayTrackActive ? 'pause' : 'play'}
                     size={isTablet() ? 40 : 20}
                     color={Colors.white}
                   />
