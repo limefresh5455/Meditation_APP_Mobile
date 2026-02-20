@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Colors } from '../constants/Colors';
 import { FONTS } from '../constants/Fonts';
-import { theme } from '../utils/responsive';
+import { isTablet, theme } from '../utils/responsive';
 import MusicImage from './MusicImage';
 
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -67,7 +67,7 @@ const SessionListItem: FC<SessionListItemProps> = ({
         ) : (
           <Icon
             name={isPlaying ? 'pause' : 'play'}
-            size={20}
+            size={isTablet() ? 40 : 20}
             color={Colors.white}
           />
         )}

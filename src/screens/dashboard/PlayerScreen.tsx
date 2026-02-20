@@ -154,14 +154,12 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
               : new Sound(finalUrl, '', callback);
 
           await TrackPlayer.play();
-          dispatch(setLastPlayedTrack(track));
         } catch (err) {
           console.log('Error in PlayerScreen setup:', err);
         }
       };
       setup();
     } else if (track && isCurrentTrackActive) {
-      dispatch(setLastPlayedTrack(track));
       if (
         activeTrack &&
         (!soundRef.current || soundUrlRef.current !== activeTrack.url)
@@ -217,6 +215,15 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
       if (isPlaying) {
         await TrackPlayer.pause();
       } else {
+        if (currentDuration > 0 && currentPosition >= currentDuration - 1) {
+          if (track?.isComposite && track.blocks) {
+            await TrackPlayer.skip(0);
+          }
+          await TrackPlayer.seekTo(0);
+          if (soundRef.current) {
+            soundRef.current.setCurrentTime(0);
+          }
+        }
         await TrackPlayer.play();
       }
     } else {

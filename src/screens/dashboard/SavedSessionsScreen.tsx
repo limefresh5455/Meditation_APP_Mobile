@@ -19,8 +19,12 @@ import TrackPlayer, {
   State,
 } from 'react-native-track-player';
 import musicData from '../../constants/musicData';
-import { useAppSelector } from '../../redux/reduxHook';
-import { selectSavedTrackIds } from '../../redux/reducers/musicSlice';
+import { useAppSelector, useAppDispatch } from '../../redux/reduxHook';
+import {
+  selectSavedTrackIds,
+  setLastPlayedTrack,
+  updatePlaybackPosition,
+} from '../../redux/reducers/musicSlice';
 import { verifyLocalFile } from '../../services/DownloadService';
 
 interface SavedSessionsScreenProps {
@@ -30,6 +34,7 @@ interface SavedSessionsScreenProps {
 const SavedSessionsScreen: FC<SavedSessionsScreenProps> = ({ navigation }) => {
   const activeTrack = useActiveTrack();
   const playbackState = usePlaybackState();
+  const dispatch = useAppDispatch();
   const isPlaying = playbackState.state === State.Playing;
   const isBuffering =
     playbackState.state === State.Buffering ||
@@ -79,6 +84,21 @@ const SavedSessionsScreen: FC<SavedSessionsScreenProps> = ({ navigation }) => {
       // Start navigation conditionally
       if (shouldNavigate) {
         navigation.navigate('PlayerScreen', { track: item });
+      }
+
+      // Save the previous track as "last played" before switching
+      if (activeTrack) {
+        const prevTrackInfo = musicData.find(
+          (m: any) =>
+            m.id === activeTrack.id ||
+            (m.isComposite &&
+              m.blocks?.some((b: any) => b.id === activeTrack.id)),
+        );
+        if (prevTrackInfo) {
+          const { position } = await TrackPlayer.getProgress();
+          dispatch(setLastPlayedTrack(prevTrackInfo));
+          dispatch(updatePlaybackPosition(position));
+        }
       }
 
       await TrackPlayer.reset();

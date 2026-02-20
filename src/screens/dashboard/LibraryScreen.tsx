@@ -23,7 +23,10 @@ import { useAppSelector } from '../../redux/reduxHook';
 import {
   selectSavedTrackIds,
   selectOfflineTrackIds,
+  setLastPlayedTrack,
+  updatePlaybackPosition,
 } from '../../redux/reducers/musicSlice';
+import { useAppDispatch } from '../../redux/reduxHook';
 import { verifyLocalFile } from '../../services/DownloadService';
 
 interface LibraryScreenProps {
@@ -33,6 +36,7 @@ interface LibraryScreenProps {
 const LibraryScreen: FC<LibraryScreenProps> = ({ navigation }) => {
   const activeTrack = useActiveTrack();
   const playbackState = usePlaybackState();
+  const dispatch = useAppDispatch();
   const isPlaying = playbackState.state === State.Playing;
   const isBuffering =
     playbackState.state === State.Buffering ||
@@ -85,6 +89,21 @@ const LibraryScreen: FC<LibraryScreenProps> = ({ navigation }) => {
 
       if (shouldNavigate) {
         navigation.navigate('PlayerScreen', { track: item });
+      }
+
+      // Save the previous track as "last played" before switching
+      if (activeTrack) {
+        const prevTrackInfo = musicData.find(
+          (m: any) =>
+            m.id === activeTrack.id ||
+            (m.isComposite &&
+              m.blocks?.some((b: any) => b.id === activeTrack.id)),
+        );
+        if (prevTrackInfo) {
+          const { position } = await TrackPlayer.getProgress();
+          dispatch(setLastPlayedTrack(prevTrackInfo));
+          dispatch(updatePlaybackPosition(position));
+        }
       }
 
       await TrackPlayer.reset();

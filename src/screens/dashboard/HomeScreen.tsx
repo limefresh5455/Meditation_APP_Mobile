@@ -17,6 +17,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import TrackPlayer, {
   useActiveTrack,
   usePlaybackState,
+  useProgress,
   State,
 } from 'react-native-track-player';
 import musicData from '../../constants/musicData';
@@ -25,8 +26,10 @@ import MusicImage from '../../components/MusicImage';
 import {
   selectLastPlayedTrack,
   selectPlaybackPosition,
+  setLastPlayedTrack,
+  updatePlaybackPosition,
 } from '../../redux/reducers/musicSlice';
-import { useAppSelector } from '../../redux/reduxHook';
+import { useAppSelector, useAppDispatch } from '../../redux/reduxHook';
 import { verifyLocalFile } from '../../services/DownloadService';
 
 interface HomeScreenProps {
@@ -36,8 +39,10 @@ interface HomeScreenProps {
 const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
   const activeTrack = useActiveTrack();
   const playbackState = usePlaybackState();
+  const { position: realTimePosition } = useProgress();
   const lastPlayedTrack = useAppSelector(selectLastPlayedTrack);
   const playbackPosition = useAppSelector(selectPlaybackPosition);
+  const dispatch = useAppDispatch();
 
   const isPlaying = playbackState.state === State.Playing;
   const isBuffering =
@@ -54,7 +59,11 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
 
   const isProcessingSelect = React.useRef(false);
 
-  const handleTrackSelect = async (item: any, resumePosition?: number) => {
+  const handleTrackSelect = async (
+    item: any,
+    resumePosition?: number,
+    skipSaveLastPlayed?: boolean,
+  ) => {
     if (isProcessingSelect.current) return;
     isProcessingSelect.current = true;
 
@@ -77,6 +86,22 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
       if (shouldNavigate) {
         navigation.navigate('PlayerScreen', { track: item });
       }
+
+      // Save the previous track as "last played" before switching
+      if (activeTrack && !skipSaveLastPlayed) {
+        const prevTrackInfo = musicData.find(
+          (m: any) =>
+            m.id === activeTrack.id ||
+            (m.isComposite &&
+              m.blocks?.some((b: any) => b.id === activeTrack.id)),
+        );
+        if (prevTrackInfo) {
+          const { position } = await TrackPlayer.getProgress();
+          dispatch(setLastPlayedTrack(prevTrackInfo));
+          dispatch(updatePlaybackPosition(position));
+        }
+      }
+
       await TrackPlayer.reset();
 
       if (item.isComposite && item.blocks) {
@@ -218,6 +243,7 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
                   activeTrack?.id === lastPlayedTrack.id
                     ? undefined
                     : playbackPosition,
+                  true,
                 )
               }
               style={[
@@ -244,26 +270,51 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
                 </Text>
                 <Text style={styles.continueSessionSubtitle}>
                   {lastPlayedTrack.artist} •{' '}
-                  {lastPlayedTrack.duration
-                    ? `${Math.max(
-                        0,
-                        Math.floor(
-                          (lastPlayedTrack.duration - playbackPosition) / 60,
-                        ),
-                      )} min left`
-                    : 'Resuming...'}
+                  {(() => {
+                    const isTrackActive =
+                      activeTrack?.id === lastPlayedTrack.id;
+                    const displayPosition = isTrackActive
+                      ? realTimePosition
+                      : playbackPosition;
+                    // Fallback to musicData for duration if missing
+                    const fullTrackInfo = musicData.find(
+                      m => m.id === lastPlayedTrack.id,
+                    );
+                    const duration =
+                      lastPlayedTrack.duration || fullTrackInfo?.duration || 0;
+                    return duration
+                      ? `${Math.max(
+                          0,
+                          Math.floor((duration - displayPosition) / 60),
+                        )} min left`
+                      : 'Resuming...';
+                  })()}
                 </Text>
                 <View style={styles.progressBarContainer}>
                   <View
                     style={[
                       styles.progressBar,
                       {
-                        width: lastPlayedTrack.duration
-                          ? `${
-                              (playbackPosition / lastPlayedTrack.duration) *
-                              100
-                            }%`
-                          : '0%',
+                        width: (() => {
+                          const isTrackActive =
+                            activeTrack?.id === lastPlayedTrack.id;
+                          const displayPosition = isTrackActive
+                            ? realTimePosition
+                            : playbackPosition;
+                          const fullTrackInfo = musicData.find(
+                            m => m.id === lastPlayedTrack.id,
+                          );
+                          const duration =
+                            lastPlayedTrack.duration ||
+                            fullTrackInfo?.duration ||
+                            0;
+                          return duration
+                            ? `${Math.min(
+                                100,
+                                (displayPosition / duration) * 100,
+                              )}%`
+                            : '0%';
+                        })(),
                       },
                     ]}
                   />
@@ -278,6 +329,7 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
                     activeTrack?.id === lastPlayedTrack.id
                       ? undefined
                       : playbackPosition,
+                    true,
                   )
                 }
               >

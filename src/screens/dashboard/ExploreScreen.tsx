@@ -20,6 +20,11 @@ import TrackPlayer, {
 } from 'react-native-track-player';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { verifyLocalFile } from '../../services/DownloadService';
+import {
+  setLastPlayedTrack,
+  updatePlaybackPosition,
+} from '../../redux/reducers/musicSlice';
+import { useAppDispatch } from '../../redux/reduxHook';
 
 const musicPlaceHolder = require('../../assets/Images/musicPlaceHolderTransparent.png');
 
@@ -47,6 +52,7 @@ interface ExploreScreenProps {
 const ExploreScreen: FC<ExploreScreenProps> = ({ navigation }) => {
   const activeTrack = useActiveTrack();
   const playbackState = usePlaybackState();
+  const dispatch = useAppDispatch();
   const isPlaying = playbackState.state === State.Playing;
   const isBuffering =
     playbackState.state === State.Buffering ||
@@ -78,6 +84,20 @@ const ExploreScreen: FC<ExploreScreenProps> = ({ navigation }) => {
       }
       if (shouldNavigate) {
         navigation.navigate('PlayerScreen', { track: item });
+      }
+
+      if (activeTrack) {
+        const prevTrackInfo = musicData.find(
+          (m: any) =>
+            m.id === activeTrack.id ||
+            (m.isComposite &&
+              m.blocks?.some((b: any) => b.id === activeTrack.id)),
+        );
+        if (prevTrackInfo) {
+          const { position } = await TrackPlayer.getProgress();
+          dispatch(setLastPlayedTrack(prevTrackInfo));
+          dispatch(updatePlaybackPosition(position));
+        }
       }
 
       await TrackPlayer.reset();
