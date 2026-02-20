@@ -11,11 +11,12 @@ import {
 import { Colors } from '../constants/Colors';
 import { FONTS } from '../constants/Fonts';
 import { theme } from '../utils/responsive';
+import MusicImage from './MusicImage';
 
 import Icon from 'react-native-vector-icons/Ionicons';
 
 interface SessionListItemProps {
-  image: ImageSourcePropType;
+  image: any;
   title: string;
   duration: string;
   fileSize: string;
@@ -43,7 +44,7 @@ const SessionListItem: FC<SessionListItemProps> = ({
       onPress={onPress}
       activeOpacity={0.8}
     >
-      <Image source={image} style={styles.thumbnail} />
+      <MusicImage uri={image} style={styles.thumbnail} />
       <View style={styles.infoContainer}>
         <Text
           style={[styles.title, isActive && styles.activeTitle]}

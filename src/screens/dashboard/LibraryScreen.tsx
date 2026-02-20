@@ -62,19 +62,31 @@ const LibraryScreen: FC<LibraryScreenProps> = ({ navigation }) => {
       track.artist.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  const handleTrackSelect = async (item: any) => {
-    const shouldNavigate = !activeTrack;
+  const isProcessingSelect = React.useRef(false);
 
-    if (isSessionActive(item)) {
-      if (isPlaying) {
-        await TrackPlayer.pause();
-      } else {
-        await TrackPlayer.play();
-      }
-      return;
-    }
+  const handleTrackSelect = async (item: any) => {
+    if (isProcessingSelect.current) return;
+    isProcessingSelect.current = true;
 
     try {
+      const shouldNavigate = !activeTrack;
+
+      if (isSessionActive(item)) {
+        if (isPlaying) {
+          await TrackPlayer.pause();
+        } else {
+          await TrackPlayer.play();
+        }
+        if (shouldNavigate) {
+          navigation.navigate('PlayerScreen', { track: item });
+        }
+        return;
+      }
+
+      if (shouldNavigate) {
+        navigation.navigate('PlayerScreen', { track: item });
+      }
+
       await TrackPlayer.reset();
 
       if (item.isComposite && item.blocks) {
@@ -94,8 +106,6 @@ const LibraryScreen: FC<LibraryScreenProps> = ({ navigation }) => {
       } else {
         const verifiedPath = await verifyLocalFile(item.id);
         const playbackUrl = verifiedPath || item.url;
-        console.log('Library: Setting up track with URL:', playbackUrl);
-
         await TrackPlayer.add({
           id: item.id,
           url: playbackUrl,
@@ -106,11 +116,10 @@ const LibraryScreen: FC<LibraryScreenProps> = ({ navigation }) => {
       }
 
       await TrackPlayer.play();
-      if (shouldNavigate) {
-        navigation.navigate('PlayerScreen', { track: item });
-      }
     } catch (e) {
       console.log('Error starting track in LibraryScreen:', e);
+    } finally {
+      isProcessingSelect.current = false;
     }
   };
 
@@ -199,6 +208,7 @@ const LibraryScreen: FC<LibraryScreenProps> = ({ navigation }) => {
                   isPlaying={isPlaying && isSessionActive(track)}
                   isActive={isSessionActive(track)}
                   isLoading={isBuffering && isSessionActive(track)}
+                  onPress={() => handleTrackSelect(track)}
                 />
               ))}
             </View>

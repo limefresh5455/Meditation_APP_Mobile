@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
 } from 'react-native';
 import TrackPlayer, {
@@ -16,32 +15,14 @@ import TrackPlayer, {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../constants/Colors';
 import { FONTS } from '../constants/Fonts';
-import { theme, wp } from '../utils/responsive';
+import { isTablet, theme, wp } from '../utils/responsive';
 import * as NavigationUtils from '../utils/NavigationUtils';
-import { resolveSessionTrack } from '../constants/musicData';
-
-const musicPlaceHolder = require('../assets/Images/musicPlaceHolderTransparent.png');
+import { musicData, resolveSessionTrack } from '../constants/musicData';
+import MusicImage from './MusicImage';
 
 interface MiniPlayerProps {
   bottomOffset: number;
 }
-
-interface MusicImageProps {
-  uri?: string;
-  style: any;
-}
-
-const MusicImage: FC<MusicImageProps> = ({ uri, style }) => {
-  const [hasError, setHasError] = React.useState(false);
-
-  return (
-    <Image
-      source={hasError || !uri ? musicPlaceHolder : { uri }}
-      style={style}
-      onError={() => setHasError(true)}
-    />
-  );
-};
 
 const MiniPlayer: FC<MiniPlayerProps> = ({ bottomOffset }) => {
   const activeTrack = useActiveTrack();
@@ -50,8 +31,27 @@ const MiniPlayer: FC<MiniPlayerProps> = ({ bottomOffset }) => {
   const isPlaying = playbackState.state === State.Playing;
 
   if (!activeTrack) return null;
+  const compositeSession = musicData.find(
+    s => s.isComposite && s.blocks?.some(b => b.id === activeTrack.id),
+  );
 
-  const progress = duration > 0 ? position / duration : 0;
+  let progress = 0;
+  if (compositeSession && compositeSession.blocks) {
+    const currentBlockIndex = compositeSession.blocks.findIndex(
+      b => b.id === activeTrack.id,
+    );
+    const completedDuration = compositeSession.blocks
+      .slice(0, currentBlockIndex)
+      .reduce((sum, b) => sum + b.duration, 0);
+    const totalDuration = compositeSession.blocks.reduce(
+      (sum, b) => sum + b.duration,
+      0,
+    );
+    const elapsed = completedDuration + position;
+    progress = totalDuration > 0 ? elapsed / totalDuration : 0;
+  } else {
+    progress = duration > 0 ? position / duration : 0;
+  }
 
   const handlePlayPause = async () => {
     if (isPlaying) {
@@ -90,7 +90,7 @@ const MiniPlayer: FC<MiniPlayerProps> = ({ bottomOffset }) => {
           ) : (
             <Icon
               name={isPlaying ? 'pause' : 'play'}
-              size={24}
+              size={isTablet() ? 40 : 24}
               color={Colors.textPrimary}
             />
           )}
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     right: theme.spacing.sm,
     backgroundColor: Colors.cardBackground,
     borderRadius: theme.radius.md,
-    height: 60,
+    height: isTablet() ? 120 : 60,
     justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },

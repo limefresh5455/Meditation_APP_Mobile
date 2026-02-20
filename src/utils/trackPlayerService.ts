@@ -1,4 +1,6 @@
-import TrackPlayer, { Event } from 'react-native-track-player';
+import TrackPlayer, { Event, State } from 'react-native-track-player';
+
+let wasPlayingBeforeInterruption = false;
 
 export async function PlaybackService() {
   TrackPlayer.addEventListener(Event.RemotePlay, () => TrackPlayer.play());
@@ -10,4 +12,15 @@ export async function PlaybackService() {
   TrackPlayer.addEventListener(Event.RemotePrevious, () =>
     TrackPlayer.skipToPrevious(),
   );
+
+  TrackPlayer.addEventListener(Event.RemoteDuck, async event => {
+    if (event.paused) {
+      const state = await TrackPlayer.getState();
+      wasPlayingBeforeInterruption = state === State.Playing;
+      await TrackPlayer.pause();
+    } else if (!event.permanent && wasPlayingBeforeInterruption) {
+      wasPlayingBeforeInterruption = false;
+      await TrackPlayer.play();
+    }
+  });
 }

@@ -66,7 +66,6 @@ const PlayerControls: FC<PlayerControlsProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Action Buttons */}
       <View style={styles.actionButtons}>
         <TouchableOpacity
           style={styles.actionButton}

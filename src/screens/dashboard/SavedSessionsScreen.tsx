@@ -60,18 +60,27 @@ const SavedSessionsScreen: FC<SavedSessionsScreenProps> = ({ navigation }) => {
   );
 
   const handleTrackSelect = async (item: any) => {
-    const shouldNavigate = !activeTrack;
-
-    if (isSessionActive(item)) {
-      if (isPlaying) {
-        await TrackPlayer.pause();
-      } else {
-        await TrackPlayer.play();
-      }
-      return;
-    }
-
     try {
+      const isSameTrack = isSessionActive(item);
+      const shouldNavigate = !activeTrack;
+
+      if (isSameTrack) {
+        if (isPlaying) {
+          await TrackPlayer.pause();
+        } else {
+          await TrackPlayer.play();
+        }
+        if (shouldNavigate) {
+          navigation.navigate('PlayerScreen', { track: item });
+        }
+        return;
+      }
+
+      // Start navigation conditionally
+      if (shouldNavigate) {
+        navigation.navigate('PlayerScreen', { track: item });
+      }
+
       await TrackPlayer.reset();
 
       if (item.isComposite && item.blocks) {
@@ -103,9 +112,6 @@ const SavedSessionsScreen: FC<SavedSessionsScreenProps> = ({ navigation }) => {
       }
 
       await TrackPlayer.play();
-      if (shouldNavigate) {
-        navigation.navigate('PlayerScreen', { track: item });
-      }
     } catch (e) {
       console.log('Error starting track in SavedSessionsScreen:', e);
     }
@@ -197,6 +203,7 @@ const SavedSessionsScreen: FC<SavedSessionsScreenProps> = ({ navigation }) => {
                   isPlaying={isPlaying && isSessionActive(track)}
                   isActive={isSessionActive(track)}
                   isLoading={isBuffering && isSessionActive(track)}
+                  onPress={() => handleTrackSelect(track)}
                 />
               ))}
             </View>

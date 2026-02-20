@@ -11,7 +11,7 @@ import {
 import React, { FC } from 'react';
 import { Colors } from '../../constants/Colors';
 import { FONTS } from '../../constants/Fonts';
-import { theme, wp } from '../../utils/responsive';
+import { isTablet, theme, wp } from '../../utils/responsive';
 import FocusAreaIcon from '../../components/FocusAreaIcon';
 import LinearGradient from 'react-native-linear-gradient';
 import TrackPlayer, {
@@ -21,6 +21,7 @@ import TrackPlayer, {
 } from 'react-native-track-player';
 import musicData from '../../constants/musicData';
 import Icon from 'react-native-vector-icons/Ionicons';
+import MusicImage from '../../components/MusicImage';
 import {
   selectLastPlayedTrack,
   selectPlaybackPosition,
@@ -51,22 +52,31 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
     return 'Good Evening';
   };
 
-  const handleTrackSelect = async (item: any, resumePosition?: number) => {
-    const shouldNavigate = !activeTrack || activeTrack.id !== item.id;
+  const isProcessingSelect = React.useRef(false);
 
-    if (activeTrack?.id === item.id) {
-      if (isPlaying) {
-        await TrackPlayer.pause();
-      } else {
-        await TrackPlayer.play();
+  const handleTrackSelect = async (item: any, resumePosition?: number) => {
+    if (isProcessingSelect.current) return;
+    isProcessingSelect.current = true;
+
+    try {
+      const isSameTrack = activeTrack?.id === item.id;
+      const shouldNavigate = !activeTrack;
+
+      if (isSameTrack) {
+        if (isPlaying) {
+          await TrackPlayer.pause();
+        } else {
+          await TrackPlayer.play();
+        }
+        if (shouldNavigate) {
+          navigation.navigate('PlayerScreen', { track: item });
+        }
+        return;
       }
+
       if (shouldNavigate) {
         navigation.navigate('PlayerScreen', { track: item });
       }
-      return;
-    }
-
-    try {
       await TrackPlayer.reset();
 
       if (item.isComposite && item.blocks) {
@@ -86,8 +96,6 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
       } else {
         const verifiedPath = await verifyLocalFile(item.id);
         const playbackUrl = verifiedPath || item.url;
-        console.log('Home: Setting up track with URL:', playbackUrl);
-
         await TrackPlayer.add({
           id: item.id,
           url: playbackUrl,
@@ -102,12 +110,10 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
       if (resumePosition && resumePosition > 0) {
         await TrackPlayer.seekTo(resumePosition);
       }
-
-      if (shouldNavigate) {
-        navigation.navigate('PlayerScreen', { track: item });
-      }
     } catch (e) {
       console.log('Error in handleTrackSelect:', e);
+    } finally {
+      isProcessingSelect.current = false;
     }
   };
 
@@ -204,7 +210,16 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
         {lastPlayedTrack && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Continue last session</Text>
-            <View
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() =>
+                handleTrackSelect(
+                  lastPlayedTrack,
+                  activeTrack?.id === lastPlayedTrack.id
+                    ? undefined
+                    : playbackPosition,
+                )
+              }
               style={[
                 styles.continueSessionCard,
                 activeTrack?.id === lastPlayedTrack.id &&
@@ -212,12 +227,8 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
               ]}
             >
               <View style={styles.continueSessionThumbnail}>
-                <Image
-                  source={
-                    lastPlayedTrack.artwork
-                      ? { uri: lastPlayedTrack.artwork }
-                      : musicPlaceHolder
-                  }
+                <MusicImage
+                  uri={lastPlayedTrack.artwork}
                   style={styles.continueSessionImage}
                 />
               </View>
@@ -260,6 +271,7 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
               </View>
               <TouchableOpacity
                 style={styles.playButtonSmall}
+                activeOpacity={0.7}
                 onPress={() =>
                   handleTrackSelect(
                     lastPlayedTrack,
@@ -278,12 +290,12 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
                         ? 'pause'
                         : 'play'
                     }
-                    size={20}
+                    size={isTablet() ? 40 : 20}
                     color={Colors.white}
                   />
                 )}
               </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -302,19 +314,23 @@ const HomeScreen: FC<HomeScreenProps> = ({ navigation }) => {
                 onPress={() => handleTrackSelect(item)}
               >
                 <View style={styles.mindfulCardImageContainer}>
-                  <Image
-                    source={{ uri: item.artwork }}
+                  <MusicImage
+                    uri={item.artwork}
                     style={styles.mindfulCardImage}
                   />
                   <View style={styles.mindfulCardOverlay}>
                     {activeTrack?.id === item.id && isPlaying ? (
                       <Icon
                         name="pause-circle"
-                        size={32}
+                        size={isTablet() ? 64 : 32}
                         color={Colors.white}
                       />
                     ) : (
-                      <Icon name="play-circle" size={32} color={Colors.white} />
+                      <Icon
+                        name="play-circle"
+                        size={isTablet() ? 64 : 32}
+                        color={Colors.white}
+                      />
                     )}
                   </View>
                 </View>

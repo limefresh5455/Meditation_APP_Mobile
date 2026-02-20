@@ -86,7 +86,10 @@ export const musicData: TrackMetadata[] = [
     genre: 'Meditation',
     duration: 420,
     artwork: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773',
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+    url: Image.resolveAssetSource(
+      require('../assets/audio/SoundHelix-Song-1.mp3'),
+    ).uri,
+    type: 'mp3',
   },
   {
     id: '2',
@@ -96,7 +99,10 @@ export const musicData: TrackMetadata[] = [
     genre: 'Meditation',
     duration: 480,
     artwork: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee',
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+    url: Image.resolveAssetSource(
+      require('../assets/audio/SoundHelix-Song-2.mp3'),
+    ).uri,
+    type: 'mp3',
   },
   {
     id: '3',
@@ -106,7 +112,10 @@ export const musicData: TrackMetadata[] = [
     genre: 'Meditation',
     duration: 600,
     artwork: 'https://images.unsplash.com/photo-1508672019048-805c876b67e2',
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+    url: Image.resolveAssetSource(
+      require('../assets/audio/SoundHelix-Song-3.mp3'),
+    ).uri,
+    type: 'mp3',
   },
   {
     id: '4',
@@ -116,7 +125,10 @@ export const musicData: TrackMetadata[] = [
     genre: 'Meditation',
     duration: 540,
     artwork: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e',
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+    url: Image.resolveAssetSource(
+      require('../assets/audio/SoundHelix-Song-4.mp3'),
+    ).uri,
+    type: 'mp3',
   },
   {
     id: '5',
@@ -126,7 +138,10 @@ export const musicData: TrackMetadata[] = [
     genre: 'Meditation',
     duration: 660,
     artwork: 'https://images.unsplash.com/photo-1499346030926-9a72daac6c63',
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
+    url: Image.resolveAssetSource(
+      require('../assets/audio/SoundHelix-Song-5.mp3'),
+    ).uri,
+    type: 'mp3',
   },
   {
     id: '6',
@@ -136,7 +151,10 @@ export const musicData: TrackMetadata[] = [
     genre: 'Meditation',
     duration: 720,
     artwork: 'https://images.unsplash.com/photo-1502082553048-f009c37129b9',
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
+    url: Image.resolveAssetSource(
+      require('../assets/audio/SoundHelix-Song-6.mp3'),
+    ).uri,
+    type: 'mp3',
   },
   {
     id: '7',
@@ -146,7 +164,10 @@ export const musicData: TrackMetadata[] = [
     genre: 'Meditation',
     duration: 540,
     artwork: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e',
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
+    url: Image.resolveAssetSource(
+      require('../assets/audio/SoundHelix-Song-7.mp3'),
+    ).uri,
+    type: 'mp3',
   },
   {
     id: '8',
@@ -156,7 +177,10 @@ export const musicData: TrackMetadata[] = [
     genre: 'Meditation',
     duration: 630,
     artwork: 'https://images.unsplash.com/photo-1501004318641-b39e6451bec6',
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
+    url: Image.resolveAssetSource(
+      require('../assets/audio/SoundHelix-Song-8.mp3'),
+    ).uri,
+    type: 'mp3',
   },
   {
     id: '9',
@@ -166,7 +190,10 @@ export const musicData: TrackMetadata[] = [
     genre: 'Meditation',
     duration: 510,
     artwork: 'https://images.unsplash.com/photo-1506784365847-bbad939e9335',
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3',
+    url: Image.resolveAssetSource(
+      require('../assets/audio/SoundHelix-Song-9.mp3'),
+    ).uri,
+    type: 'mp3',
   },
   {
     id: '10',
@@ -176,7 +203,10 @@ export const musicData: TrackMetadata[] = [
     genre: 'Meditation',
     duration: 900,
     artwork: 'https://images.unsplash.com/photo-1505483531331-8325e9c6d4f6',
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3',
+    url: Image.resolveAssetSource(
+      require('../assets/audio/SoundHelix-Song-10.mp3'),
+    ).uri,
+    type: 'mp3',
   },
 ];
 

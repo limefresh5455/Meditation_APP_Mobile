@@ -11,7 +11,7 @@ import {
 import React, { FC } from 'react';
 import { Colors } from '../../constants/Colors';
 import { FONTS } from '../../constants/Fonts';
-import { theme, wp } from '../../utils/responsive';
+import { isTablet, theme, wp } from '../../utils/responsive';
 import musicData from '../../constants/musicData';
 import TrackPlayer, {
   useActiveTrack,
@@ -19,7 +19,6 @@ import TrackPlayer, {
   State,
 } from 'react-native-track-player';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useAppSelector } from '../../redux/reduxHook';
 import { verifyLocalFile } from '../../services/DownloadService';
 
 const musicPlaceHolder = require('../../assets/Images/musicPlaceHolderTransparent.png');
@@ -53,22 +52,34 @@ const ExploreScreen: FC<ExploreScreenProps> = ({ navigation }) => {
     playbackState.state === State.Buffering ||
     playbackState.state === State.Loading;
 
-  const handleTrackSelect = async (item: any) => {
-    const shouldNavigate = !activeTrack;
+  const isTrackActive = (item: any): boolean => {
+    if (!activeTrack) return false;
+    if (item.isComposite && item.blocks) {
+      return item.blocks.some((block: any) => block.id === activeTrack.id);
+    }
+    return activeTrack.id === item.id;
+  };
 
-    if (activeTrack?.id === item.id) {
-      if (isPlaying) {
-        await TrackPlayer.pause();
-      } else {
-        await TrackPlayer.play();
+  const handleTrackSelect = async (item: any) => {
+    try {
+      const isSameTrack = isTrackActive(item);
+      const shouldNavigate = !activeTrack;
+
+      if (isSameTrack) {
+        if (isPlaying) {
+          await TrackPlayer.pause();
+        } else {
+          await TrackPlayer.play();
+        }
+        if (shouldNavigate) {
+          navigation.navigate('PlayerScreen', { track: item });
+        }
+        return;
       }
       if (shouldNavigate) {
         navigation.navigate('PlayerScreen', { track: item });
       }
-      return;
-    }
 
-    try {
       await TrackPlayer.reset();
 
       if (item.isComposite && item.blocks) {
@@ -100,16 +111,13 @@ const ExploreScreen: FC<ExploreScreenProps> = ({ navigation }) => {
       }
 
       await TrackPlayer.play();
-      if (shouldNavigate) {
-        navigation.navigate('PlayerScreen', { track: item });
-      }
     } catch (e) {
       console.log('Error in handleTrackSelect:', e);
     }
   };
 
   const renderMusicItem = ({ item }: { item: any }) => {
-    const isActive = activeTrack?.id === item.id;
+    const isActive = isTrackActive(item);
     const isCurrentPlaying = isActive && isPlaying;
 
     return (
@@ -140,7 +148,7 @@ const ExploreScreen: FC<ExploreScreenProps> = ({ navigation }) => {
           ) : (
             <Icon
               name={isCurrentPlaying ? 'pause-circle' : 'play-circle'}
-              size={28}
+              size={isTablet() ? 48 : 28}
               color={isActive ? Colors.primary : Colors.textTertiary}
             />
           )}
@@ -163,7 +171,14 @@ const ExploreScreen: FC<ExploreScreenProps> = ({ navigation }) => {
         data={musicData}
         renderItem={renderMusicItem}
         keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          {
+            paddingBottom: isTablet()
+              ? theme.spacing.xxl * 1.5
+              : theme.spacing.xxl * 2,
+          },
+        ]}
         showsVerticalScrollIndicator={false}
       />
     </SafeAreaView>
@@ -181,7 +196,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: theme.layout.containerPadding,
-    paddingBottom: theme.spacing.xxl,
   },
   title: {
     fontFamily: FONTS.Bold,

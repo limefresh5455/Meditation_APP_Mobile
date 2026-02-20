@@ -5,8 +5,6 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
-  Image,
-  ActivityIndicator,
 } from 'react-native';
 import React, { FC, useEffect, useState, useRef } from 'react';
 import Sound from 'react-native-sound';
@@ -21,6 +19,7 @@ import TrackPlayer, {
   useActiveTrack,
   State,
 } from 'react-native-track-player';
+import Toast from 'react-native-simple-toast';
 import {
   setLastPlayedTrack,
   updatePlaybackPosition,
@@ -41,35 +40,12 @@ import {
   verifyLocalFile,
 } from '../../services/DownloadService';
 import { resolveSessionTrack } from '../../constants/musicData';
-
-interface MusicImageProps {
-  uri?: any;
-  style: any;
-}
+import MusicImage from '../../components/MusicImage';
 
 interface PlayerScreenProps {
   navigation: any;
   route: any;
 }
-
-const MusicImage: FC<MusicImageProps> = ({ uri, style }) => {
-  const [hasError, setHasError] = useState(false);
-
-  const getSource = () => {
-    if (hasError || !uri) return musicPlaceHolder;
-    if (typeof uri === 'number') return uri;
-    if (typeof uri === 'string') return { uri };
-    return uri;
-  };
-
-  return (
-    <Image
-      source={getSource()}
-      style={style}
-      onError={() => setHasError(true)}
-    />
-  );
-};
 
 const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
   const { track: rawTrack } = route.params || {};
@@ -108,17 +84,34 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
     updateRepeatMode();
   }, [isRepeatOne]);
 
+  const setupIdRef = useRef(0);
+
   useEffect(() => {
     Sound.setCategory('Playback', true);
     let isMounted = true;
+    const currentSetupId = ++setupIdRef.current;
+
+    const cleanupSound = () => {
+      if (soundRef.current) {
+        soundRef.current.stop();
+        soundRef.current.release();
+        soundRef.current = null;
+        soundUrlRef.current = null;
+      }
+    };
+
     if (track && activeTrack !== undefined && !isCurrentTrackActive) {
       const setup = async () => {
         try {
           const verifiedPath = await verifyLocalFile(track.id);
           const playbackUrl = verifiedPath || track.url;
-          console.log('Player: Setting up track with URL:', playbackUrl);
+          if (currentSetupId !== setupIdRef.current) return;
+
+          console.log('Player: Setting up track:', track.title);
 
           await TrackPlayer.reset();
+          if (currentSetupId !== setupIdRef.current) return;
+
           await TrackPlayer.add({
             id: track.id,
             url: playbackUrl,
@@ -127,26 +120,15 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
             artwork: track.artwork || musicPlaceHolder,
           });
 
-          if (soundRef.current) {
-            soundRef.current.release();
-            soundRef.current = null;
-          }
+          cleanupSound();
 
-          if (!playbackUrl) {
-            console.log('Player: No playback URL available');
-            return;
-          }
-
-          if (!playbackUrl) {
-            console.log('Player: No playback URL available');
-            return;
-          }
+          if (!playbackUrl || currentSetupId !== setupIdRef.current) return;
 
           const finalUrl =
             typeof playbackUrl === 'number' ? playbackUrl : String(playbackUrl);
 
           const callback = (error: any) => {
-            if (!isMounted) {
+            if (!isMounted || currentSetupId !== setupIdRef.current) {
               sound?.release();
               return;
             }
@@ -184,20 +166,15 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
         activeTrack &&
         (!soundRef.current || soundUrlRef.current !== activeTrack.url)
       ) {
-        if (soundRef.current) {
-          soundRef.current.release();
-        }
+        cleanupSound();
         const playbackUrl = activeTrack.url;
-        if (!playbackUrl) {
-          console.log('Player: activeTrack has no URL');
-          return;
-        }
+        if (!playbackUrl) return;
 
         const finalUrl =
           typeof playbackUrl === 'number' ? playbackUrl : String(playbackUrl);
 
         const callback = (error: any) => {
-          if (!isMounted) {
+          if (!isMounted || currentSetupId !== setupIdRef.current) {
             sound?.release();
             return;
           }
@@ -283,8 +260,10 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
       } else {
         await deleteTrackFile(track.id);
       }
+      Toast.show('Removed from offline', Toast.SHORT);
     } else {
       dispatch(toggleOfflineTrack(track.id));
+
       let success = true;
       if (track.isComposite && track.blocks) {
         const results = await Promise.all(
@@ -293,11 +272,14 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
         success = results.every(path => path !== null);
       } else {
         const path = await downloadTrack(track.id, track.url);
-        success = !!path;
+        success = path !== null;
       }
 
       if (!success) {
         dispatch(toggleOfflineTrack(track.id));
+        Toast.show('Download failed', Toast.SHORT);
+      } else {
+        Toast.show('Downloaded successfully', Toast.SHORT);
       }
     }
   };
@@ -488,14 +470,7 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
               onPress={handlePlayPause}
               activeOpacity={0.8}
             >
-              {playbackState.state === State.Buffering ||
-              playbackState.state === State.Loading ? (
-                <ActivityIndicator color={Colors.white} size="large" />
-              ) : (
-                <Text style={styles.playPauseIcon}>
-                  {isPlaying ? '❚❚' : '▶'}
-                </Text>
-              )}
+              <Text style={styles.playPauseIcon}>{isPlaying ? '❚❚' : '▶'}</Text>
             </TouchableOpacity>
           </View>
 
@@ -512,7 +487,6 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
               progress={
                 currentDuration > 0 ? currentPosition / currentDuration : 0
               }
-              onSeek={() => {}}
               onSlidingComplete={async value => {
                 if (isCurrentTrackActive && currentDuration > 0) {
                   const targetSessionTime = value * currentDuration;
@@ -562,8 +536,6 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
             </View>
           </View>
 
-          {/* Panning removed from here */}
-
           <PlayerControls
             isPlaying={isPlaying}
             onPlayPause={handlePlayPause}
@@ -592,7 +564,8 @@ const PlayerScreen: FC<PlayerScreenProps> = ({ navigation, route }) => {
             <View style={styles.verticalSliderContainer}>
               <Slider
                 progress={(panValue + 1) / 2}
-                onSeek={value => handlePanChange(value * 2 - 1)}
+                onSeek={v => handlePanChange(v * 2 - 1)}
+                onSlidingComplete={v => handlePanChange(v * 2 - 1)}
                 height={4}
                 orientation="vertical"
                 backgroundColor={Colors.storageBackground}
